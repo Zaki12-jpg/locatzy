@@ -7,6 +7,13 @@ import { useState, useEffect } from "react";
 
 const COMMISSION_RATE = 0.10;
 
+// 📧 CONFIGURATION EMAILJS - Remplacez par vos vraies clés
+const EMAILJS_CONFIG = {
+  serviceId: "VOTRE_SERVICE_ID",    // ex: service_abc123
+  templateId: "VOTRE_TEMPLATE_ID",  // ex: template_xyz789
+  publicKey: "VOTRE_PUBLIC_KEY",    // ex: AbCdEf123456
+};
+
 // 🌍 Liste mondiale de pays + villes (extrait — utilisateurs peuvent ajouter)
 // 📱 Préfixes téléphoniques par pays (code + longueur attendue)
 const PHONE_CODES = [
@@ -327,6 +334,13 @@ export default function App() {
     reload();
     const s = localStorage.getItem("lcy_session");
     if (s) setUser(JSON.parse(s));
+    // Charger EmailJS
+    if (!window.emailjs && EMAILJS_CONFIG.publicKey !== "VOTRE_PUBLIC_KEY") {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js";
+      script.onload = () => { window.emailjs.init({ publicKey: EMAILJS_CONFIG.publicKey }); };
+      document.head.appendChild(script);
+    }
   }, []);
 
   const reload = () => {
@@ -344,18 +358,31 @@ export default function App() {
     const all = DB.get("lcy_notifications");
     DB.set("lcy_notifications", [...all, { id: Date.now() + Math.random(), userId: uid, message: msg, type, read: false, date: new Date().toISOString() }]);
   };
-  const sendEmail = (to, sub, body) => console.log(`📧 → ${to}\n${sub}\n${body}`);
+  const sendEmail = (to, sub, body, params = {}) => {
+    console.log(`📧 → ${to}\n${sub}\n${body}`);
+    // EmailJS - envoi réel (si configuré)
+    if (window.emailjs && EMAILJS_CONFIG.serviceId && to) {
+      try {
+        window.emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+          to_email: to,
+          to_name: params.to_name || to,
+          subject: sub,
+          message: body,
+          reset_code: params.reset_code || "",
+          ...params,
+        }, EMAILJS_CONFIG.publicKey).then(
+          () => console.log("✅ Email envoyé à " + to),
+          (err) => console.log("❌ Erreur email:", err)
+        );
+      } catch (e) { console.log("❌ EmailJS erreur:", e); }
+    }
+  };
 
   const login = (identifier, password) => {
-    // L'identifier peut être un email OU un téléphone
-    const isEmail = identifier.includes("@");
     const id = identifier.trim();
     const found = DB.get("lcy_users").find(u => {
       if (u.password !== password) return false;
-      if (isEmail) return u.email && u.email.toLowerCase() === id.toLowerCase();
-      // Téléphone : on enlève les espaces pour comparer
-      const cleanPhone = (s) => (s || "").replace(/\s+/g, "");
-      return u.phone && cleanPhone(u.phone) === cleanPhone(id);
+      return u.email && u.email.toLowerCase() === id.toLowerCase();
     });
     if (!found) return flash("Identifiants incorrects", "#ef4444");
     setUser(found);
@@ -368,20 +395,45 @@ export default function App() {
     const all = DB.get("lcy_users");
     // Vérifier doublon par email
     if (data.email && all.find(u => u.email && u.email.toLowerCase() === data.email.toLowerCase())) return flash("Email déjà utilisé", "#ef4444");
-    // Vérifier doublon par téléphone
-    if (data.phone) {
-      const cleanPhone = (s) => (s || "").replace(/\s+/g, "");
-      if (all.find(u => u.phone && cleanPhone(u.phone) === cleanPhone(data.phone))) return flash("Numéro déjà utilisé", "#ef4444");
-    }
     const newU = { ...data, id: Date.now(), role: "user", joined: new Date().toISOString().split("T")[0] };
     DB.set("lcy_users", [...all, newU]);
     setUser(newU);
     localStorage.setItem("lcy_session", JSON.stringify(newU));
+    // Email de bienvenue
+    sendEmail(data.email, "Bienvenue sur Locatzy 🎉", `Bonjour ${data.name},\n\nVotre compte Locatzy a été créé avec succès !\n\nVous pouvez maintenant publier vos annonces et réserver des biens partout dans le monde.\n\nL'équipe Locatzy`, { to_name: data.name, type: "welcome" });
     flash(`Compte créé ! Bienvenue ${data.name} !`);
     setModal(null);
     reload();
   };
   const logout = () => { setUser(null); localStorage.removeItem("lcy_session"); setPage("home"); flash("Déconnecté"); };
+
+  // Mot de passe oublié - envoyer un code
+  const sendResetCode = (email) => {
+    const all = DB.get("lcy_users");
+    const found = all.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+    if (!found) { flash("Aucun compte avec cet email", "#ef4444"); return null; }
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    // Sauvegarder le code temporairement
+    localStorage.setItem("lcy_reset_" + email.toLowerCase(), JSON.stringify({ code, expires: Date.now() + 3600000 }));
+    sendEmail(email, "Code de réinitialisation Locatzy 🔐", `Votre code de réinitialisation est : ${code}\n\nCe code expire dans 1 heure.`, { to_name: found.name, reset_code: code });
+    flash("📧 Code envoyé par email !");
+    return code;
+  };
+
+  // Vérifier le code et changer le mot de passe
+  const resetPassword = (email, code, newPassword) => {
+    const stored = localStorage.getItem("lcy_reset_" + email.toLowerCase());
+    if (!stored) { flash("Aucune demande de réinitialisation", "#ef4444"); return false; }
+    const { code: savedCode, expires } = JSON.parse(stored);
+    if (Date.now() > expires) { flash("Code expiré, recommencez", "#ef4444"); return false; }
+    if (code !== savedCode) { flash("Code incorrect", "#ef4444"); return false; }
+    const all = DB.get("lcy_users");
+    const updated = all.map(u => u.email && u.email.toLowerCase() === email.toLowerCase() ? { ...u, password: newPassword } : u);
+    DB.set("lcy_users", updated);
+    localStorage.removeItem("lcy_reset_" + email.toLowerCase());
+    flash("✅ Mot de passe changé ! Connectez-vous.");
+    return true;
+  };
 
   const addListing = (data) => {
     const all = DB.get("lcy_listings");
@@ -1954,40 +2006,55 @@ function Modal({ modal, setModal, login, register, addListing, book, user, setPa
             <h2 className="display" style={{ fontWeight: 800, fontSize: 28, marginBottom: 8 }}>Bon retour 👋</h2>
             <p style={{ color: "#6b7280", marginBottom: 24, fontSize: 14 }}>Connectez-vous à votre compte</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {/* Toggle Email / Téléphone */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, background: "#f3f4f6", padding: 4, borderRadius: 12 }}>
-                <button type="button" onClick={() => set("loginMethod", "email")} style={{ padding: 10, borderRadius: 9, background: (form.loginMethod || "email") === "email" ? "white" : "transparent", color: (form.loginMethod || "email") === "email" ? "#0a0a0a" : "#6b7280", fontWeight: 700, fontSize: 13, boxShadow: (form.loginMethod || "email") === "email" ? "0 2px 6px rgba(0,0,0,0.08)" : "none" }}>📧 Email</button>
-                <button type="button" onClick={() => set("loginMethod", "phone")} style={{ padding: 10, borderRadius: 9, background: form.loginMethod === "phone" ? "white" : "transparent", color: form.loginMethod === "phone" ? "#0a0a0a" : "#6b7280", fontWeight: 700, fontSize: 13, boxShadow: form.loginMethod === "phone" ? "0 2px 6px rgba(0,0,0,0.08)" : "none" }}>📱 Téléphone</button>
-              </div>
-
-              {(form.loginMethod || "email") === "email" ? (
-                <input className="input" placeholder="Email" type="email" value={form.email || ""} onChange={e => set("email", e.target.value)} />
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "130px 1fr", gap: 8 }}>
-                  <select className="input" value={form.phoneCode || "+212"} onChange={e => set("phoneCode", e.target.value)} style={{ paddingLeft: 8, paddingRight: 4 }}>
-                    {PHONE_CODES.map(p => (
-                      <option key={`${p.code}-${p.country}`} value={p.code}>{p.flag} {p.code}</option>
-                    ))}
-                  </select>
-                  <input className="input" placeholder="Votre numéro" type="tel" inputMode="numeric" value={form.phoneNumber || ""} onChange={e => set("phoneNumber", e.target.value.replace(/\D/g, ""))} />
-                </div>
-              )}
-
-              <input className="input" placeholder="Mot de passe" type="password" value={form.password || ""} onChange={e => set("password", e.target.value)} />
+              <input className="input" placeholder="📧 Email" type="email" value={form.email || ""} onChange={e => set("email", e.target.value)} />
+              <input className="input" placeholder="🔒 Mot de passe" type="password" value={form.password || ""} onChange={e => set("password", e.target.value)} />
               {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
               <button className="btn btn-primary" onClick={() => {
-                const method = form.loginMethod || "email";
+                if (!form.email) return setFormError("Email obligatoire");
                 if (!form.password) return setFormError("Mot de passe obligatoire");
-                if (method === "email") {
-                  if (!form.email) return setFormError("Email obligatoire");
-                  login(form.email, form.password);
-                } else {
-                  if (!form.phoneNumber) return setFormError("Numéro obligatoire");
-                  const fullPhone = `${form.phoneCode || "+212"}${form.phoneNumber}`;
-                  login(fullPhone, form.password);
-                }
+                login(form.email, form.password);
               }}>Se connecter</button>
+              <p style={{ textAlign: "center", fontSize: 13 }}><button style={{ background: "none", color: "#14b8a6", fontWeight: 600 }} onClick={() => setModal({ type: "forgotPassword" })}>Mot de passe oublié ?</button></p>
               <p style={{ textAlign: "center", fontSize: 13, color: "#6b7280" }}>Pas de compte ? <button style={{ background: "none", color: "#14b8a6", fontWeight: 600 }} onClick={() => setModal({ type: "register" })}>S'inscrire</button></p>
+            </div>
+          </>
+        )}
+
+        {modal.type === "forgotPassword" && (
+          <>
+            <h2 className="display" style={{ fontWeight: 800, fontSize: 26, marginBottom: 8 }}>Mot de passe oublié 🔑</h2>
+            <p style={{ color: "#6b7280", marginBottom: 20, fontSize: 14 }}>{form.codeSent ? "Entrez le code reçu par email + votre nouveau mot de passe" : "Entrez votre email pour recevoir un code"}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input className="input" placeholder="📧 Votre email" type="email" value={form.email || ""} onChange={e => set("email", e.target.value)} disabled={form.codeSent} />
+
+              {form.codeSent && (
+                <>
+                  <input className="input" placeholder="🔢 Code à 6 chiffres" inputMode="numeric" value={form.resetCode || ""} onChange={e => set("resetCode", e.target.value.replace(/\D/g, ""))} />
+                  <input className="input" placeholder="🔒 Nouveau mot de passe" type="password" value={form.newPassword || ""} onChange={e => set("newPassword", e.target.value)} />
+                </>
+              )}
+
+              {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
+
+              {!form.codeSent ? (
+                <button className="btn btn-primary" onClick={() => {
+                  if (!form.email) return setFormError("Email obligatoire");
+                  const code = sendResetCode(form.email);
+                  if (code) { set("codeSent", true); setFormError(""); }
+                  else setFormError("Aucun compte avec cet email");
+                }}>Envoyer le code</button>
+              ) : (
+                <button className="btn btn-primary" onClick={() => {
+                  if (!form.resetCode) return setFormError("Code obligatoire");
+                  if (!form.newPassword) return setFormError("Nouveau mot de passe obligatoire");
+                  if (form.newPassword.length < 6) return setFormError("Mot de passe trop court (min 6)");
+                  const ok = resetPassword(form.email, form.resetCode, form.newPassword);
+                  if (ok) { setForm({}); setModal({ type: "login" }); }
+                  else setFormError("Code incorrect ou expiré");
+                }}>Changer le mot de passe</button>
+              )}
+
+              <p style={{ textAlign: "center", fontSize: 13, color: "#6b7280" }}><button style={{ background: "none", color: "#14b8a6", fontWeight: 600 }} onClick={() => { setForm({}); setModal({ type: "login" }); }}>← Retour à la connexion</button></p>
             </div>
           </>
         )}
@@ -1997,60 +2064,24 @@ function Modal({ modal, setModal, login, register, addListing, book, user, setPa
             <h2 className="display" style={{ fontWeight: 800, fontSize: 28, marginBottom: 8 }}>Rejoindre Locatzy ✨</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <input className="input" placeholder="Nom complet" value={form.name || ""} onChange={e => set("name", e.target.value)} />
-              
-              {/* Toggle Email / Téléphone */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, background: "#f3f4f6", padding: 4, borderRadius: 12 }}>
-                <button type="button" onClick={() => set("regMethod", "email")} style={{ padding: 10, borderRadius: 9, background: (form.regMethod || "email") === "email" ? "white" : "transparent", color: (form.regMethod || "email") === "email" ? "#0a0a0a" : "#6b7280", fontWeight: 700, fontSize: 13, boxShadow: (form.regMethod || "email") === "email" ? "0 2px 6px rgba(0,0,0,0.08)" : "none" }}>📧 Email</button>
-                <button type="button" onClick={() => set("regMethod", "phone")} style={{ padding: 10, borderRadius: 9, background: form.regMethod === "phone" ? "white" : "transparent", color: form.regMethod === "phone" ? "#0a0a0a" : "#6b7280", fontWeight: 700, fontSize: 13, boxShadow: form.regMethod === "phone" ? "0 2px 6px rgba(0,0,0,0.08)" : "none" }}>📱 Téléphone</button>
-              </div>
-
-              {(form.regMethod || "email") === "email" ? (
-                <input className="input" placeholder="Email" type="email" value={form.email || ""} onChange={e => set("email", e.target.value)} />
-              ) : (
-                <div>
-                  <div style={{ display: "grid", gridTemplateColumns: "130px 1fr", gap: 8 }}>
-                    <select className="input" value={form.phoneCode || "+212"} onChange={e => set("phoneCode", e.target.value)} style={{ paddingLeft: 8, paddingRight: 4 }}>
-                      {PHONE_CODES.map(p => (
-                        <option key={`${p.code}-${p.country}`} value={p.code}>{p.flag} {p.code}</option>
-                      ))}
-                    </select>
-                    <input className="input" placeholder="Votre numéro" type="tel" inputMode="numeric" value={form.phoneNumber || ""} onChange={e => {
-                      // N'accepter QUE des chiffres
-                      const digits = e.target.value.replace(/\D/g, "");
-                      set("phoneNumber", digits);
-                    }} />
-                  </div>
-                  <p style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
-                    {(() => {
-                      const code = PHONE_CODES.find(p => p.code === (form.phoneCode || "+212"));
-                      return code ? `📱 ${code.flag} ${code.country}` : "";
-                    })()}
-                  </p>
-                </div>
-              )}
-
+              <input className="input" placeholder="📧 Email" type="email" value={form.email || ""} onChange={e => set("email", e.target.value)} />
               <select className="input" value={form.country || ""} onChange={e => set("country", e.target.value)}>
                 <option value="">— Choisir votre pays —</option>
                 {Object.keys(COUNTRIES).sort().map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <input className="input" placeholder="Mot de passe" type="password" value={form.password || ""} onChange={e => set("password", e.target.value)} />
+              <input className="input" placeholder="🔒 Mot de passe" type="password" value={form.password || ""} onChange={e => set("password", e.target.value)} />
               {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
               <button className="btn btn-primary" onClick={() => {
                 if (!form.name) return setFormError("Nom obligatoire");
-                const method = form.regMethod || "email";
-                if (method === "email" && !form.email) return setFormError("Email obligatoire");
-                if (method === "phone") {
-                  if (!form.phoneNumber) return setFormError("Numéro de téléphone obligatoire");
-                  if (form.phoneNumber.length < 6) return setFormError("Numéro trop court (minimum 6 chiffres)");
-                  if (form.phoneNumber.length > 15) return setFormError("Numéro trop long (maximum 15 chiffres)");
-                }
+                if (!form.email) return setFormError("Email obligatoire");
+                if (!/\S+@\S+\.\S+/.test(form.email)) return setFormError("Email invalide");
                 if (!form.country) return setFormError("Pays obligatoire");
                 if (!form.password) return setFormError("Mot de passe obligatoire");
-                const fullPhone = method === "phone" ? `${form.phoneCode || "+212"}${form.phoneNumber}` : "";
+                if (form.password.length < 6) return setFormError("Mot de passe trop court (min 6 caractères)");
                 register({
                   name: form.name,
-                  email: method === "email" ? form.email : "",
-                  phone: fullPhone,
+                  email: form.email,
+                  phone: "",
                   country: form.country,
                   password: form.password,
                 });
