@@ -515,7 +515,7 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", minHeight: "100vh", background: darkMode ? "#000" : "#e5e7eb", color: darkMode ? "#f5f5f5" : "#0a0a0a", display: "flex", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 430, minHeight: "100vh", background: darkMode ? "#0f0f0f" : "#fafafa", position: "relative", boxShadow: "0 0 40px rgba(0,0,0,0.08)", paddingBottom: 80 }}>
+      <div className="app-container" style={{ width: "100%", minHeight: "100vh", background: darkMode ? "#0f0f0f" : "#fafafa", position: "relative", boxShadow: "0 0 40px rgba(0,0,0,0.08)", paddingBottom: 80 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fraunces:wght@600;800&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -523,6 +523,41 @@ export default function App() {
         button, input, textarea, select { font-family: inherit; }
         button { cursor: pointer; border: none; }
         .display { font-family: 'Fraunces', serif; }
+
+        /* RESPONSIVE - Mobile par défaut (max 430px) */
+        .app-container { max-width: 430px; }
+        .bottom-nav { max-width: 430px; }
+
+        /* TABLETTE (768px+) */
+        @media (min-width: 768px) {
+          .app-container { max-width: 100%; padding-bottom: 0 !important; }
+          .bottom-nav { display: none !important; }
+          .desktop-nav { display: flex !important; }
+          .listings-grid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 20px !important; }
+          .content-wrapper { max-width: 1200px; margin: 0 auto; padding: 20px 40px !important; }
+          .hero-section { padding: 60px 40px !important; border-radius: 24px; margin: 20px; }
+        }
+
+        /* PC/LAPTOP (1024px+) */
+        @media (min-width: 1024px) {
+          .listings-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 24px !important; }
+          .content-wrapper { max-width: 1400px; padding: 30px 60px !important; }
+          .hero-section { padding: 80px 60px !important; }
+          .detail-grid { display: grid !important; grid-template-columns: 2fr 1fr; gap: 40px; }
+        }
+
+        /* GRAND ÉCRAN (1440px+) */
+        @media (min-width: 1440px) {
+          .listings-grid { grid-template-columns: repeat(4, 1fr) !important; }
+        }
+
+        .desktop-nav { display: none; }
+        .mobile-only { display: block; }
+
+        @media (min-width: 768px) {
+          .mobile-only { display: none !important; }
+        }
+
         .card { background: ${darkMode ? "#1a1a1a" : "white"}; border-radius: 18px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.25s; border: 1px solid ${darkMode ? "#2a2a2a" : "#f0f0f0"}; color: ${darkMode ? "#f5f5f5" : "#0a0a0a"}; }
         .card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.08); }
         .btn { padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 14px; transition: all 0.2s; }
@@ -559,7 +594,20 @@ export default function App() {
             <div style={{ fontSize: 9, color: "#6b7280", letterSpacing: 1, fontWeight: 600 }}>🌍 WORLDWIDE</div>
           </div>
         </div>
-        <button className="nav-btn" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 Explorer</button>
+
+        {/* NAV DESKTOP - Visible uniquement sur PC */}
+        <div className="desktop-nav" style={{ alignItems: "center", gap: 6 }}>
+          <button className="nav-btn" onClick={() => setPage("home")} style={{ fontWeight: page === "home" ? 700 : 500, color: page === "home" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined }}>🏠 Accueil</button>
+          {user && <button className="nav-btn" onClick={() => setPage("my")} style={{ fontWeight: page === "my" ? 700 : 500, color: page === "my" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined }}>📋 Annonces</button>}
+          {user && <button className="nav-btn" onClick={() => setPage("messages")} style={{ fontWeight: page === "messages" ? 700 : 500, color: page === "messages" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined, position: "relative" }}>💬 Messages{unreadMessagesCount > 0 && <span style={{ position: "absolute", top: 2, right: 2, background: "#ef4444", color: "white", borderRadius: 50, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{unreadMessagesCount}</span>}</button>}
+          {user && <button className="nav-btn" onClick={() => { setPage("notif"); markAllRead(); }} style={{ fontWeight: page === "notif" ? 700 : 500, color: page === "notif" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined, position: "relative" }}>🔔 Notif{unreadCount > 0 && <span style={{ position: "absolute", top: 2, right: 2, background: "#ef4444", color: "white", borderRadius: 50, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{unreadCount}</span>}</button>}
+          {user?.role === "admin" && <button className="nav-btn" onClick={() => setPage("admin")} style={{ fontWeight: page === "admin" ? 700 : 500, color: "#14b8a6" }}>⚡ Admin</button>}
+          <button className="nav-btn" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 600 }}>🌍 Explorer</button>
+          <button className="nav-btn" onClick={() => user ? setPage("profile") : setModal({ type: "login" })} style={{ background: user ? (darkMode ? "#14b8a6" : "#0a0a0a") : "#14b8a6", color: "white", fontWeight: 700, marginLeft: 8 }}>{user ? `👤 ${user.name}` : "🔑 Connexion"}</button>
+        </div>
+
+        {/* BOUTON EXPLORER MOBILE */}
+        <button className="nav-btn mobile-only" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 Explorer</button>
       </nav>
 
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
@@ -572,8 +620,8 @@ export default function App() {
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} />}
       {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} onToggleFav={handleToggleFavorite} setModal={setModal} /> }
 
-      {/* BOTTOM NAV FIXED */}
-      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
+      {/* BOTTOM NAV FIXED - Mobile uniquement */}
+      <div className="bottom-nav" style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
         <BottomBtn icon="🏠" label="Accueil" active={page === "home"} onClick={() => setPage("home")} darkMode={darkMode} />
         {user && <BottomBtn icon="📋" label="Annonces" active={page === "my"} onClick={() => setPage("my")} darkMode={darkMode} />}
         {user && <BottomBtn icon="💬" label="Messages" active={page === "messages"} badge={unreadMessagesCount} onClick={() => setPage("messages")} darkMode={darkMode} />}
@@ -690,7 +738,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
   const [advancedDropdownOpen, setAdvancedDropdownOpen] = useState(false);
   return (
     <div>
-      <div style={{ background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)", padding: "32px 20px 50px", position: "relative", overflow: "hidden" }}>
+      <div className="hero-section" style={{ background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)", padding: "32px 20px 50px", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: -80, right: -80, width: 240, height: 240, borderRadius: "50%", background: "radial-gradient(circle, #14b8a6 0%, transparent 70%)", opacity: 0.4 }} />
         <div style={{ position: "relative", textAlign: "center" }}>
           <div style={{ display: "inline-block", background: "rgba(20,184,166,0.15)", color: "#5eead4", padding: "5px 12px", borderRadius: 50, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>🌍 Disponible dans le monde entier</div>
@@ -953,7 +1001,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
         );
       })()}
 
-      <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="content-wrapper" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 14 }}>
         {dateFrom && dateTo && (
           <div style={{ background: "linear-gradient(135deg,#14b8a6,#0d9488)", color: "white", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 22 }}>📅</span>
@@ -963,8 +1011,10 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
             </div>
           </div>
         )}
+        <div className="listings-grid" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {listings.length === 0 ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 60, color: "#9ca3af" }}><div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div><p>{dateFrom && dateTo ? "Aucune annonce disponible à ces dates" : "Aucune annonce trouvée"}</p>{dateFrom && dateTo && <p style={{ fontSize: 12, marginTop: 8 }}>Essayez d'autres dates</p>}</div>
           : listings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} />)}
+        </div>
       </div>
     </div>
   );
