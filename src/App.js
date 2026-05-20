@@ -114,16 +114,11 @@ const DB = {
   init: () => {
     if (!localStorage.getItem("lcy_users")) {
       DB.set("lcy_users", [
-        { id: 1, name: "Admin Locatzy", email: "admin@locatzy.com", password: "admin123", role: "admin", country: "🌍 Global", joined: "2024-01-01" },
-        { id: 2, name: "Marie Dupont", email: "marie@mail.com", password: "pass123", role: "user", country: "🇫🇷 France", joined: "2024-01-08" },
-        { id: 3, name: "John Smith", email: "john@mail.com", password: "pass123", role: "user", country: "🇺🇸 USA", joined: "2024-01-11" },
+        { id: 1, name: "Oualid", email: "blackberrywalid72@gmail.com", password: "Zaki_walid_123", role: "admin", country: "🌍 Global", joined: "2026-05-19" },
       ]);
     }
     if (!localStorage.getItem("lcy_listings")) {
-      DB.set("lcy_listings", [
-        { id: 1, type: "apartment", title: "Loft moderne Paris", country: "🇫🇷 France", city: "Paris", price: 95, ownerId: 2, ownerName: "Marie Dupont", ownerEmail: "marie@mail.com", photos: ["🏙️"], rooms: 2, guests: 4, desc: "Superbe loft vue Tour Eiffel.", status: "approved", createdAt: "2024-01-10" },
-        { id: 2, type: "car", title: "Tesla Model 3", country: "🇺🇸 USA", city: "New York", price: 80, ownerId: 3, ownerName: "John Smith", ownerEmail: "john@mail.com", photos: ["🚗"], seats: 5, desc: "Voiture électrique récente, GPS.", status: "approved", createdAt: "2024-01-12" },
-      ]);
+      DB.set("lcy_listings", []);
     }
     if (!localStorage.getItem("lcy_bookings")) DB.set("lcy_bookings", []);
     if (!localStorage.getItem("lcy_notifications")) DB.set("lcy_notifications", []);
@@ -432,7 +427,7 @@ export default function App() {
     addNotif(listing.ownerId, `🎉 ${info.fullName || user.name} a réservé "${listing.title}" du ${from} au ${to} — Vous gagnez ${ownerEarnings}€`, "new_booking");
     sendEmail(listing.ownerEmail, `Nouvelle réservation Locatzy`, `${info.fullName || user.name} a réservé du ${from} au ${to}. Tél: ${info.phone || "—"}. Gain: ${ownerEarnings}€`);
     addNotif(1, `💰 ${user.name} → "${listing.title}" — Commission : ${commission}€`, "commission");
-    sendEmail("admin@locatzy.com", `Commission ${commission}€`, `Réservation: ${user.name} → ${listing.title}`);
+    sendEmail("blackberrywalid72@gmail.com", `Commission ${commission}€`, `Réservation: ${user.name} → ${listing.title}`);
     addNotif(user.id, `✓ Réservation confirmée : "${listing.title}" — Total ${subtotal}€`, "confirmation");
     reload();
     flash(`✓ Réservation confirmée ! ${subtotal}€`);
@@ -1993,9 +1988,6 @@ function Modal({ modal, setModal, login, register, addListing, book, user, setPa
                 }
               }}>Se connecter</button>
               <p style={{ textAlign: "center", fontSize: 13, color: "#6b7280" }}>Pas de compte ? <button style={{ background: "none", color: "#14b8a6", fontWeight: 600 }} onClick={() => setModal({ type: "register" })}>S'inscrire</button></p>
-              <div style={{ background: "#f9fafb", borderRadius: 10, padding: 12, fontSize: 12, color: "#6b7280" }}>
-                <strong>🔑 Comptes test :</strong><br />Admin : <code>admin@locatzy.com</code> / <code>admin123</code><br />User : <code>marie@mail.com</code> / <code>pass123</code>
-              </div>
             </div>
           </>
         )}
