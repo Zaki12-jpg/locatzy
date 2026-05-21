@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { db, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "./firebase";
 
 // ════════════════════════════════════════════════════════════════════
 // LOCATZY — Plateforme mondiale de location (appartements & voitures)
@@ -9,9 +10,9 @@ const COMMISSION_RATE = 0.10;
 
 // 📧 CONFIGURATION EMAILJS - Remplacez par vos vraies clés
 const EMAILJS_CONFIG = {
-  serviceId: "VOTRE_SERVICE_ID",    // ex: service_abc123
-  templateId: "VOTRE_TEMPLATE_ID",  // ex: template_xyz789
-  publicKey: "VOTRE_PUBLIC_KEY",    // ex: AbCdEf123456
+  serviceId: "service_41scm6k",
+  templateId: "template_i6l3qbr",
+  publicKey: "r52Uh9tQbOL86SlxA",
 };
 
 // 🌍 Liste mondiale de pays + villes (extrait — utilisateurs peuvent ajouter)
@@ -341,6 +342,15 @@ export default function App() {
       script.onload = () => { window.emailjs.init({ publicKey: EMAILJS_CONFIG.publicKey }); };
       document.head.appendChild(script);
     }
+    // 🔥 FIREBASE : écouter les annonces en temps réel (partagées par tous)
+    const unsub = onSnapshot(collection(db, "listings"), (snapshot) => {
+      const fbListings = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setListings(fbListings);
+      DB.set("lcy_listings", fbListings); // garder une copie locale
+    }, (err) => {
+      console.log("Firebase listings error:", err);
+    });
+    return () => unsub();
   }, []);
 
   const reload = () => {
@@ -364,10 +374,12 @@ export default function App() {
     if (window.emailjs && EMAILJS_CONFIG.serviceId && to) {
       try {
         window.emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
-          to_email: to,
-          to_name: params.to_name || to,
+          email: to,
+          name: params.to_name || to,
           subject: sub,
           message: body,
+          to_email: to,
+          to_name: params.to_name || to,
           reset_code: params.reset_code || "",
           ...params,
         }, EMAILJS_CONFIG.publicKey).then(
@@ -394,16 +406,54 @@ export default function App() {
   const register = (data) => {
     const all = DB.get("lcy_users");
     // Vérifier doublon par email
-    if (data.email && all.find(u => u.email && u.email.toLowerCase() === data.email.toLowerCase())) return flash("Email déjà utilisé", "#ef4444");
-    const newU = { ...data, id: Date.now(), role: "user", joined: new Date().toISOString().split("T")[0] };
+    if (data.email && all.find(u => u.email && u.email.toLowerCase() === data.email.toLowerCase())) { return { ok: false, error: "Email déjà utilisé" }; }
+    // Générer un code de vérification à 5 chiffres
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    // Sauvegarder l'inscription EN ATTENTE de vérification (pas encore dans lcy_users)
+    localStorage.setItem("lcy_pending_" + data.email.toLowerCase(), JSON.stringify({
+      data, code, expires: Date.now() + 900000 // 15 minutes
+    }));
+    // Envoyer le code par email
+    sendEmail(data.email, "Votre code de confirmation Locatzy 🔐", `Bonjour ${data.name},\n\nBienvenue sur Locatzy ! Voici votre code de confirmation :\n\n👉 ${code}\n\nEntrez ce code sur le site pour activer votre compte.\nCe code expire dans 15 minutes.`, { to_name: data.name, reset_code: code });
+    flash("📧 Code de confirmation envoyé !");
+    setModal({ type: "verifyEmail", data: { email: data.email, name: data.name } });
+    return { ok: true };
+  };
+
+  // Vérifier le code de confirmation d'email
+  const verifyEmailCode = (email, codeEntered) => {
+    const raw = localStorage.getItem("lcy_pending_" + email.toLowerCase());
+    if (!raw) { return { ok: false, error: "Aucune inscription en attente. Recommencez." }; }
+    const pending = JSON.parse(raw);
+    if (Date.now() > pending.expires) { return { ok: false, error: "Code expiré. Demandez un nouveau code." }; }
+    if (codeEntered.trim() !== pending.code) { return { ok: false, error: "Code incorrect. Réessayez." }; }
+    // Code correct → créer le compte pour de vrai
+    const all = DB.get("lcy_users");
+    const newU = { ...pending.data, id: Date.now(), role: "user", verified: true, joined: new Date().toISOString().split("T")[0] };
     DB.set("lcy_users", [...all, newU]);
+    localStorage.removeItem("lcy_pending_" + email.toLowerCase());
     setUser(newU);
     localStorage.setItem("lcy_session", JSON.stringify(newU));
     // Email de bienvenue
-    sendEmail(data.email, "Bienvenue sur Locatzy 🎉", `Bonjour ${data.name},\n\nVotre compte Locatzy a été créé avec succès !\n\nVous pouvez maintenant publier vos annonces et réserver des biens partout dans le monde.\n\nL'équipe Locatzy`, { to_name: data.name, type: "welcome" });
-    flash(`Compte créé ! Bienvenue ${data.name} !`);
+    sendEmail(newU.email, "Bienvenue sur Locatzy 🎉", `Bonjour ${newU.name},\n\nVotre compte Locatzy est activé !\n\nVous pouvez maintenant publier vos annonces et réserver des biens partout dans le monde.\n\nL'équipe Locatzy`, { to_name: newU.name, type: "welcome" });
+    flash(`Compte activé ! Bienvenue ${newU.name} ! 🎉`);
     setModal(null);
     reload();
+    return { ok: true };
+  };
+
+  // Renvoyer un nouveau code de confirmation
+  const resendVerifyCode = (email) => {
+    const raw = localStorage.getItem("lcy_pending_" + email.toLowerCase());
+    if (!raw) { return { ok: false, error: "Aucune inscription en attente. Recommencez." }; }
+    const pending = JSON.parse(raw);
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    pending.code = code;
+    pending.expires = Date.now() + 900000;
+    localStorage.setItem("lcy_pending_" + email.toLowerCase(), JSON.stringify(pending));
+    sendEmail(email, "Votre nouveau code Locatzy 🔐", `Bonjour ${pending.data.name},\n\nVoici votre nouveau code de confirmation :\n\n👉 ${code}\n\nCe code expire dans 15 minutes.`, { to_name: pending.data.name, reset_code: code });
+    flash("📧 Nouveau code envoyé !");
+    return { ok: true };
   };
   const logout = () => { setUser(null); localStorage.removeItem("lcy_session"); setPage("home"); flash("Déconnecté"); };
 
@@ -412,10 +462,10 @@ export default function App() {
     const all = DB.get("lcy_users");
     const found = all.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
     if (!found) { flash("Aucun compte avec cet email", "#ef4444"); return null; }
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    // Sauvegarder le code temporairement
-    localStorage.setItem("lcy_reset_" + email.toLowerCase(), JSON.stringify({ code, expires: Date.now() + 3600000 }));
-    sendEmail(email, "Code de réinitialisation Locatzy 🔐", `Votre code de réinitialisation est : ${code}\n\nCe code expire dans 1 heure.`, { to_name: found.name, reset_code: code });
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    // Sauvegarder le code temporairement (15 minutes)
+    localStorage.setItem("lcy_reset_" + email.toLowerCase(), JSON.stringify({ code, expires: Date.now() + 900000 }));
+    sendEmail(email, "Code de réinitialisation Locatzy 🔐", `Bonjour ${found.name},\n\nVoici votre code pour réinitialiser votre mot de passe :\n\n👉 ${code}\n\nEntrez ce code sur le site pour choisir un nouveau mot de passe.\nCe code expire dans 15 minutes.`, { to_name: found.name, reset_code: code });
     flash("📧 Code envoyé par email !");
     return code;
   };
@@ -435,15 +485,19 @@ export default function App() {
     return true;
   };
 
-  const addListing = (data) => {
-    const all = DB.get("lcy_listings");
+  const addListing = async (data) => {
     const newL = { ...data, id: Date.now(), ownerId: user.id, ownerName: user.name, ownerEmail: user.email, status: "pending", createdAt: new Date().toISOString().split("T")[0] };
-    DB.set("lcy_listings", [...all, newL]);
-    addNotif(1, `Nouvelle annonce à modérer : "${data.title}" par ${user.name}`, "moderation");
-    reload();
-    flash("✓ Annonce enregistrée ! En attente de validation par l'admin.");
-    setModal(null);
-    setPage("my");
+    try {
+      // 🔥 Enregistrer l'annonce dans Firebase (partagée par tous)
+      await addDoc(collection(db, "listings"), newL);
+      addNotif(1, `Nouvelle annonce à modérer : "${data.title}" par ${user.name}`, "moderation");
+      flash("✓ Annonce enregistrée ! En attente de validation par l'admin.");
+      setModal(null);
+      setPage("my");
+    } catch (err) {
+      console.log("Erreur ajout annonce Firebase:", err);
+      flash("Erreur lors de l'enregistrement. Réessayez.", "#ef4444");
+    }
   };
 
   const book = (listing, from, to, info = {}) => {
@@ -509,9 +563,9 @@ export default function App() {
     reload();
   };
 
-  const approveListing = (id) => { DB.set("lcy_listings", DB.get("lcy_listings").map(l => l.id === id ? { ...l, status: "approved" } : l)); reload(); flash("Annonce approuvée"); };
-  const rejectListing = (id) => { DB.set("lcy_listings", DB.get("lcy_listings").map(l => l.id === id ? { ...l, status: "rejected" } : l)); reload(); flash("Annonce refusée", "#ef4444"); };
-  const deleteListing = (id) => { DB.set("lcy_listings", DB.get("lcy_listings").filter(l => l.id !== id)); reload(); flash("Annonce supprimée", "#ef4444"); };
+  const approveListing = async (fbId) => { try { await updateDoc(doc(db, "listings", fbId), { status: "approved" }); flash("Annonce approuvée"); } catch (e) { flash("Erreur", "#ef4444"); } };
+  const rejectListing = async (fbId) => { try { await updateDoc(doc(db, "listings", fbId), { status: "rejected" }); flash("Annonce refusée", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
+  const deleteListing = async (fbId) => { try { await deleteDoc(doc(db, "listings", fbId)); flash("Annonce supprimée", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
   const deleteUser = (id) => { DB.set("lcy_users", DB.get("lcy_users").filter(u => u.id !== id)); reload(); flash("Utilisateur supprimé", "#ef4444"); };
 
   const visible = listings.filter(l => {
@@ -631,7 +685,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} addListing={addListing} book={book} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} book={book} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -1815,8 +1869,8 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
               <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
                 <span style={{ fontSize: 24 }}>{PROPERTY_TYPES[l.type] && PROPERTY_TYPES[l.type].icon || "🏠"}</span>
                 <div style={{ flex: 1 }}><strong style={{ fontSize: 14 }}>{l.title}</strong><p style={{ fontSize: 12, color: "#6b7280" }}>{l.ownerName} · {l.city}</p></div>
-                <button className="btn btn-accent" style={{ padding: "6px 14px", fontSize: 12 }} onClick={() => approveListing(l.id)}>✓</button>
-                <button className="btn" style={{ background: "#fee2e2", color: "#dc2626", padding: "6px 14px", fontSize: 12 }} onClick={() => rejectListing(l.id)}>✗</button>
+                <button className="btn btn-accent" style={{ padding: "6px 14px", fontSize: 12 }} onClick={() => approveListing(l.fbId)}>✓</button>
+                <button className="btn" style={{ background: "#fee2e2", color: "#dc2626", padding: "6px 14px", fontSize: 12 }} onClick={() => rejectListing(l.fbId)}>✗</button>
               </div>
             ))}
           </div>
@@ -1836,8 +1890,8 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
                   <p style={{ color: "#6b7280", fontSize: 13 }}>📍 {l.city}, {l.country} · {l.price}€/j</p>
                   <p style={{ color: "#9ca3af", fontSize: 12 }}>👤 {l.ownerName} ({l.ownerEmail})</p>
                 </div>
-                <button className="btn btn-accent" onClick={() => approveListing(l.id)}>✓ Approuver</button>
-                <button className="btn btn-ghost" style={{ borderColor: "#fecaca", color: "#dc2626" }} onClick={() => rejectListing(l.id)}>✗ Refuser</button>
+                <button className="btn btn-accent" onClick={() => approveListing(l.fbId)}>✓ Approuver</button>
+                <button className="btn btn-ghost" style={{ borderColor: "#fecaca", color: "#dc2626" }} onClick={() => rejectListing(l.fbId)}>✗ Refuser</button>
               </div>
             );
           })}
@@ -1877,8 +1931,8 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
                 <p style={{ color: "#6b7280", fontSize: 12 }}>📍 {l.city}, {l.country} · {l.ownerName}</p>
               </div>
               <Status status={l.status} />
-              {l.status === "pending" && <button className="btn btn-accent" style={{ padding: "6px 14px", fontSize: 12 }} onClick={() => approveListing(l.id)}>✓</button>}
-              <button className="btn" style={{ background: "#fee2e2", color: "#dc2626", padding: "6px 12px", fontSize: 12 }} onClick={() => deleteListing(l.id)}>🗑</button>
+              {l.status === "pending" && <button className="btn btn-accent" style={{ padding: "6px 14px", fontSize: 12 }} onClick={() => approveListing(l.fbId)}>✓</button>}
+              <button className="btn" style={{ background: "#fee2e2", color: "#dc2626", padding: "6px 12px", fontSize: 12 }} onClick={() => deleteListing(l.fbId)}>🗑</button>
             </div>
           ))}
         </div>
@@ -1925,7 +1979,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, addListing, book, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, book, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -2029,8 +2083,9 @@ function Modal({ modal, setModal, login, register, addListing, book, user, setPa
 
               {form.codeSent && (
                 <>
-                  <input className="input" placeholder="🔢 Code à 6 chiffres" inputMode="numeric" value={form.resetCode || ""} onChange={e => set("resetCode", e.target.value.replace(/\D/g, ""))} />
+                  <input className="input" placeholder="Code à 5 chiffres" inputMode="numeric" maxLength={5} value={form.resetCode || ""} onChange={e => set("resetCode", e.target.value.replace(/\D/g, ""))} style={{ textAlign: "center", fontSize: 22, letterSpacing: 6, fontWeight: 700 }} />
                   <input className="input" placeholder="🔒 Nouveau mot de passe" type="password" value={form.newPassword || ""} onChange={e => set("newPassword", e.target.value)} />
+                  <input className="input" placeholder="🔒 Confirmer le mot de passe" type="password" value={form.confirmPassword || ""} onChange={e => set("confirmPassword", e.target.value)} />
                 </>
               )}
 
@@ -2048,6 +2103,7 @@ function Modal({ modal, setModal, login, register, addListing, book, user, setPa
                   if (!form.resetCode) return setFormError("Code obligatoire");
                   if (!form.newPassword) return setFormError("Nouveau mot de passe obligatoire");
                   if (form.newPassword.length < 6) return setFormError("Mot de passe trop court (min 6)");
+                  if (form.newPassword !== form.confirmPassword) return setFormError("Les mots de passe ne correspondent pas");
                   const ok = resetPassword(form.email, form.resetCode, form.newPassword);
                   if (ok) { setForm({}); setModal({ type: "login" }); }
                   else setFormError("Code incorrect ou expiré");
@@ -2070,6 +2126,7 @@ function Modal({ modal, setModal, login, register, addListing, book, user, setPa
                 {Object.keys(COUNTRIES).sort().map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <input className="input" placeholder="🔒 Mot de passe" type="password" value={form.password || ""} onChange={e => set("password", e.target.value)} />
+              <input className="input" placeholder="🔒 Confirmer le mot de passe" type="password" value={form.confirmPassword || ""} onChange={e => set("confirmPassword", e.target.value)} />
               {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
               <button className="btn btn-primary" onClick={() => {
                 if (!form.name) return setFormError("Nom obligatoire");
@@ -2078,15 +2135,36 @@ function Modal({ modal, setModal, login, register, addListing, book, user, setPa
                 if (!form.country) return setFormError("Pays obligatoire");
                 if (!form.password) return setFormError("Mot de passe obligatoire");
                 if (form.password.length < 6) return setFormError("Mot de passe trop court (min 6 caractères)");
-                register({
+                if (form.password !== form.confirmPassword) return setFormError("Les mots de passe ne correspondent pas");
+                const res = register({
                   name: form.name,
                   email: form.email,
                   phone: "",
                   country: form.country,
                   password: form.password,
                 });
+                if (res && !res.ok) return setFormError(res.error);
+                setForm({});
               }}>Créer mon compte</button>
               <p style={{ textAlign: "center", fontSize: 13, color: "#6b7280" }}>Déjà inscrit ? <button style={{ background: "none", color: "#14b8a6", fontWeight: 600 }} onClick={() => setModal({ type: "login" })}>Connexion</button></p>
+            </div>
+          </>
+        )}
+
+        {modal.type === "verifyEmail" && (
+          <>
+            <h2 className="display" style={{ fontWeight: 800, fontSize: 26, marginBottom: 8 }}>Vérifiez votre email 📧</h2>
+            <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 16 }}>Nous avons envoyé un code à 5 chiffres à <strong>{modal.data?.email}</strong>. Entrez-le ci-dessous pour activer votre compte.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input className="input" placeholder="Code à 5 chiffres" inputMode="numeric" maxLength={5} value={form.code || ""} onChange={e => set("code", e.target.value.replace(/[^0-9]/g, ""))} style={{ textAlign: "center", fontSize: 24, letterSpacing: 8, fontWeight: 700 }} />
+              {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
+              <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => {
+                if (!form.code || form.code.length !== 5) return setFormError("Entrez les 5 chiffres du code");
+                const res = verifyEmailCode(modal.data.email, form.code);
+                if (res && !res.ok) return setFormError(res.error);
+              }}>✅ Activer mon compte</button>
+              <p style={{ textAlign: "center", fontSize: 13, color: "#6b7280" }}>Pas reçu le code ? <button style={{ background: "none", color: "#14b8a6", fontWeight: 600 }} onClick={() => { const res = resendVerifyCode(modal.data.email); if (res && !res.ok) setFormError(res.error); else setFormError(""); }}>Renvoyer le code</button></p>
+              <p style={{ textAlign: "center", fontSize: 13, color: "#6b7280" }}><button style={{ background: "none", color: "#9ca3af", fontWeight: 600 }} onClick={() => { setForm({}); setFormError(""); setModal({ type: "register" }); }}>← Modifier mon email</button></p>
             </div>
           </>
         )}
