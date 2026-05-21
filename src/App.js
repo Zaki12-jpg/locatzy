@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { db, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from "./firebase";
+import { db, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDocs } from "./firebase";
 
 // ════════════════════════════════════════════════════════════════════
 // LOCATZY — Plateforme mondiale de location (appartements & voitures)
@@ -120,11 +120,7 @@ const DB = {
   get: (k) => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } },
   set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
   init: () => {
-    if (!localStorage.getItem("lcy_users")) {
-      DB.set("lcy_users", [
-        { id: 1, name: "Oualid", email: "blackberrywalid72@gmail.com", password: "Zaki_walid_123", role: "admin", country: "🌍 Global", joined: "2026-05-19" },
-      ]);
-    }
+    // Les comptes (lcy_users) sont désormais gérés par Firebase, plus besoin de les initialiser ici.
     if (!localStorage.getItem("lcy_listings")) {
       DB.set("lcy_listings", []);
     }
@@ -350,13 +346,30 @@ export default function App() {
     }, (err) => {
       console.log("Firebase listings error:", err);
     });
-    return () => unsub();
+    // 🔥 FIREBASE : écouter les comptes en temps réel (partagés entre appareils)
+    const unsubUsers = onSnapshot(collection(db, "users"), async (snapshot) => {
+      const fbUsers = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id, id: d.id }));
+      // Si aucun compte admin n'existe encore, le créer automatiquement
+      if (!fbUsers.some(u => u.role === "admin")) {
+        try {
+          await addDoc(collection(db, "users"), {
+            name: "Oualid", email: "blackberrywalid72@gmail.com", password: "Zaki_walid_123",
+            role: "admin", country: "🌍 Global", joined: "2026-05-19",
+          });
+          return; // l'écoute se redéclenchera avec l'admin ajouté
+        } catch (e) { console.log("Erreur création admin:", e); }
+      }
+      setUsers(fbUsers);
+      DB.set("lcy_users", fbUsers); // garder une copie locale
+    }, (err) => {
+      console.log("Firebase users error:", err);
+    });
+    return () => { unsub(); unsubUsers(); };
   }, []);
 
   const reload = () => {
     setListings(DB.get("lcy_listings"));
     setBookings(DB.get("lcy_bookings"));
-    setUsers(DB.get("lcy_users"));
     setNotifications(DB.get("lcy_notifications"));
     setReviews(DB.get("lcy_reviews"));
     setMessages(DB.get("lcy_messages"));
@@ -392,7 +405,7 @@ export default function App() {
 
   const login = (identifier, password) => {
     const id = identifier.trim();
-    const found = DB.get("lcy_users").find(u => {
+    const found = users.find(u => {
       if (u.password !== password) return false;
       return u.email && u.email.toLowerCase() === id.toLowerCase();
     });
@@ -404,9 +417,8 @@ export default function App() {
     setModal(null);
   };
   const register = (data) => {
-    const all = DB.get("lcy_users");
-    // Vérifier doublon par email
-    if (data.email && all.find(u => u.email && u.email.toLowerCase() === data.email.toLowerCase())) { return { ok: false, error: "Email déjà utilisé" }; }
+    // Vérifier doublon par email (dans les comptes Firebase déjà chargés)
+    if (data.email && users.find(u => u.email && u.email.toLowerCase() === data.email.toLowerCase())) { return { ok: false, error: "Email déjà utilisé" }; }
     // Générer un code de vérification à 5 chiffres
     const code = Math.floor(10000 + Math.random() * 90000).toString();
     // Sauvegarder l'inscription EN ATTENTE de vérification (pas encore dans lcy_users)
@@ -421,25 +433,29 @@ export default function App() {
   };
 
   // Vérifier le code de confirmation d'email
-  const verifyEmailCode = (email, codeEntered) => {
+  const verifyEmailCode = async (email, codeEntered) => {
     const raw = localStorage.getItem("lcy_pending_" + email.toLowerCase());
     if (!raw) { return { ok: false, error: "Aucune inscription en attente. Recommencez." }; }
     const pending = JSON.parse(raw);
     if (Date.now() > pending.expires) { return { ok: false, error: "Code expiré. Demandez un nouveau code." }; }
     if (codeEntered.trim() !== pending.code) { return { ok: false, error: "Code incorrect. Réessayez." }; }
-    // Code correct → créer le compte pour de vrai
-    const all = DB.get("lcy_users");
-    const newU = { ...pending.data, id: Date.now(), role: "user", verified: true, joined: new Date().toISOString().split("T")[0] };
-    DB.set("lcy_users", [...all, newU]);
-    localStorage.removeItem("lcy_pending_" + email.toLowerCase());
-    setUser(newU);
-    localStorage.setItem("lcy_session", JSON.stringify(newU));
-    // Email de bienvenue
-    sendEmail(newU.email, "Bienvenue sur Locatzy 🎉", `Bonjour ${newU.name},\n\nVotre compte Locatzy est activé !\n\nVous pouvez maintenant publier vos annonces et réserver des biens partout dans le monde.\n\nL'équipe Locatzy`, { to_name: newU.name, type: "welcome" });
-    flash(`Compte activé ! Bienvenue ${newU.name} ! 🎉`);
-    setModal(null);
-    reload();
-    return { ok: true };
+    // Code correct → créer le compte dans Firebase (partagé entre appareils)
+    const newU = { ...pending.data, role: "user", verified: true, joined: new Date().toISOString().split("T")[0] };
+    try {
+      const ref = await addDoc(collection(db, "users"), newU);
+      const userWithId = { ...newU, fbId: ref.id, id: ref.id };
+      localStorage.removeItem("lcy_pending_" + email.toLowerCase());
+      setUser(userWithId);
+      localStorage.setItem("lcy_session", JSON.stringify(userWithId));
+      // Email de bienvenue
+      sendEmail(newU.email, "Bienvenue sur Locatzy 🎉", `Bonjour ${newU.name},\n\nVotre compte Locatzy est activé !\n\nVous pouvez maintenant publier vos annonces et réserver des biens partout dans le monde.\n\nL'équipe Locatzy`, { to_name: newU.name, type: "welcome" });
+      flash(`Compte activé ! Bienvenue ${newU.name} ! 🎉`);
+      setModal(null);
+      return { ok: true };
+    } catch (e) {
+      console.log("Erreur création compte Firebase:", e);
+      return { ok: false, error: "Erreur lors de la création du compte. Réessayez." };
+    }
   };
 
   // Renvoyer un nouveau code de confirmation
@@ -459,8 +475,7 @@ export default function App() {
 
   // Mot de passe oublié - envoyer un code
   const sendResetCode = (email) => {
-    const all = DB.get("lcy_users");
-    const found = all.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+    const found = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
     if (!found) { flash("Aucun compte avec cet email", "#ef4444"); return null; }
     const code = Math.floor(10000 + Math.random() * 90000).toString();
     // Sauvegarder le code temporairement (15 minutes)
@@ -471,18 +486,24 @@ export default function App() {
   };
 
   // Vérifier le code et changer le mot de passe
-  const resetPassword = (email, code, newPassword) => {
+  const resetPassword = async (email, code, newPassword) => {
     const stored = localStorage.getItem("lcy_reset_" + email.toLowerCase());
     if (!stored) { flash("Aucune demande de réinitialisation", "#ef4444"); return false; }
     const { code: savedCode, expires } = JSON.parse(stored);
     if (Date.now() > expires) { flash("Code expiré, recommencez", "#ef4444"); return false; }
     if (code !== savedCode) { flash("Code incorrect", "#ef4444"); return false; }
-    const all = DB.get("lcy_users");
-    const updated = all.map(u => u.email && u.email.toLowerCase() === email.toLowerCase() ? { ...u, password: newPassword } : u);
-    DB.set("lcy_users", updated);
-    localStorage.removeItem("lcy_reset_" + email.toLowerCase());
-    flash("✅ Mot de passe changé ! Connectez-vous.");
-    return true;
+    const found = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+    if (!found || !found.fbId) { flash("Compte introuvable", "#ef4444"); return false; }
+    try {
+      await updateDoc(doc(db, "users", found.fbId), { password: newPassword });
+      localStorage.removeItem("lcy_reset_" + email.toLowerCase());
+      flash("✅ Mot de passe changé ! Connectez-vous.");
+      return true;
+    } catch (e) {
+      console.log("Erreur reset password Firebase:", e);
+      flash("Erreur, réessayez", "#ef4444");
+      return false;
+    }
   };
 
   const addListing = async (data) => {
@@ -566,7 +587,7 @@ export default function App() {
   const approveListing = async (fbId) => { try { await updateDoc(doc(db, "listings", fbId), { status: "approved" }); flash("Annonce approuvée"); } catch (e) { flash("Erreur", "#ef4444"); } };
   const rejectListing = async (fbId) => { try { await updateDoc(doc(db, "listings", fbId), { status: "rejected" }); flash("Annonce refusée", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
   const deleteListing = async (fbId) => { try { await deleteDoc(doc(db, "listings", fbId)); flash("Annonce supprimée", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
-  const deleteUser = (id) => { DB.set("lcy_users", DB.get("lcy_users").filter(u => u.id !== id)); reload(); flash("Utilisateur supprimé", "#ef4444"); };
+  const deleteUser = async (fbId) => { try { await deleteDoc(doc(db, "users", fbId)); flash("Utilisateur supprimé", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
 
   const visible = listings.filter(l => {
     if (l.status !== "approved") return false;
@@ -2099,12 +2120,12 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   else setFormError("Aucun compte avec cet email");
                 }}>Envoyer le code</button>
               ) : (
-                <button className="btn btn-primary" onClick={() => {
+                <button className="btn btn-primary" onClick={async () => {
                   if (!form.resetCode) return setFormError("Code obligatoire");
                   if (!form.newPassword) return setFormError("Nouveau mot de passe obligatoire");
                   if (form.newPassword.length < 6) return setFormError("Mot de passe trop court (min 6)");
                   if (form.newPassword !== form.confirmPassword) return setFormError("Les mots de passe ne correspondent pas");
-                  const ok = resetPassword(form.email, form.resetCode, form.newPassword);
+                  const ok = await resetPassword(form.email, form.resetCode, form.newPassword);
                   if (ok) { setForm({}); setModal({ type: "login" }); }
                   else setFormError("Code incorrect ou expiré");
                 }}>Changer le mot de passe</button>
@@ -2158,9 +2179,9 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <input className="input" placeholder="Code à 5 chiffres" inputMode="numeric" maxLength={5} value={form.code || ""} onChange={e => set("code", e.target.value.replace(/[^0-9]/g, ""))} style={{ textAlign: "center", fontSize: 24, letterSpacing: 8, fontWeight: 700 }} />
               {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
-              <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => {
+              <button className="btn btn-primary" style={{ width: "100%" }} onClick={async () => {
                 if (!form.code || form.code.length !== 5) return setFormError("Entrez les 5 chiffres du code");
-                const res = verifyEmailCode(modal.data.email, form.code);
+                const res = await verifyEmailCode(modal.data.email, form.code);
                 if (res && !res.ok) return setFormError(res.error);
               }}>✅ Activer mon compte</button>
               <p style={{ textAlign: "center", fontSize: 13, color: "#6b7280" }}>Pas reçu le code ? <button style={{ background: "none", color: "#14b8a6", fontWeight: 600 }} onClick={() => { const res = resendVerifyCode(modal.data.email); if (res && !res.ok) setFormError(res.error); else setFormError(""); }}>Renvoyer le code</button></p>
