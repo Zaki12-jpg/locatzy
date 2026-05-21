@@ -124,7 +124,6 @@ const DB = {
     if (!localStorage.getItem("lcy_listings")) {
       DB.set("lcy_listings", []);
     }
-    if (!localStorage.getItem("lcy_bookings")) DB.set("lcy_bookings", []);
     if (!localStorage.getItem("lcy_notifications")) DB.set("lcy_notifications", []);
     if (!localStorage.getItem("lcy_custom_cities")) localStorage.setItem("lcy_custom_cities", JSON.stringify({}));
     if (!localStorage.getItem("lcy_reviews")) DB.set("lcy_reviews", []);
@@ -364,12 +363,19 @@ export default function App() {
     }, (err) => {
       console.log("Firebase users error:", err);
     });
-    return () => { unsub(); unsubUsers(); };
+    // 🔥 FIREBASE : écouter les réservations en temps réel (partagées entre appareils)
+    const unsubBookings = onSnapshot(collection(db, "bookings"), (snapshot) => {
+      const fbBookings = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setBookings(fbBookings);
+      DB.set("lcy_bookings", fbBookings); // garder une copie locale (pour les helpers de dates)
+    }, (err) => {
+      console.log("Firebase bookings error:", err);
+    });
+    return () => { unsub(); unsubUsers(); unsubBookings(); };
   }, []);
 
   const reload = () => {
     setListings(DB.get("lcy_listings"));
-    setBookings(DB.get("lcy_bookings"));
     setNotifications(DB.get("lcy_notifications"));
     setReviews(DB.get("lcy_reviews"));
     setMessages(DB.get("lcy_messages"));
@@ -521,7 +527,7 @@ export default function App() {
     }
   };
 
-  const book = (listing, from, to, info = {}) => {
+  const book = async (listing, from, to, info = {}) => {
     if (!user) return setModal({ type: "login" });
     const conflict = findConflict(listing.id, from, to);
     if (conflict) { flash(`❌ Conflit avec une réservation du ${conflict.from} au ${conflict.to}`, "#ef4444"); return false; }
@@ -550,13 +556,18 @@ export default function App() {
       status: "confirmed",
       createdAt: new Date().toISOString()
     };
-    DB.set("lcy_bookings", [...DB.get("lcy_bookings"), newB]);
+    try {
+      await addDoc(collection(db, "bookings"), newB);
+    } catch (e) {
+      console.log("Erreur création réservation Firebase:", e);
+      flash("Erreur lors de la réservation. Réessayez.", "#ef4444");
+      return false;
+    }
     addNotif(listing.ownerId, `🎉 ${info.fullName || user.name} a réservé "${listing.title}" du ${from} au ${to} — Vous gagnez ${ownerEarnings}€`, "new_booking");
     sendEmail(listing.ownerEmail, `Nouvelle réservation Locatzy`, `${info.fullName || user.name} a réservé du ${from} au ${to}. Tél: ${info.phone || "—"}. Gain: ${ownerEarnings}€`);
     addNotif(1, `💰 ${user.name} → "${listing.title}" — Commission : ${commission}€`, "commission");
     sendEmail("blackberrywalid72@gmail.com", `Commission ${commission}€`, `Réservation: ${user.name} → ${listing.title}`);
     addNotif(user.id, `✓ Réservation confirmée : "${listing.title}" — Total ${subtotal}€`, "confirmation");
-    reload();
     flash(`✓ Réservation confirmée ! ${subtotal}€`);
     setModal(null);
   };
@@ -2498,10 +2509,10 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
 
               <div style={{ display: "flex", gap: 8 }}>
                 <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModal({ type: "bookingInfo", data: { listing, from, to } })}>← Retour</button>
-                <button className="btn btn-primary" style={{ flex: 2, background: "linear-gradient(135deg,#14b8a6,#0d9488)" }} onClick={() => {
+                <button className="btn btn-primary" style={{ flex: 2, background: "linear-gradient(135deg,#14b8a6,#0d9488)" }} onClick={async () => {
                   if (!form.paymentMethod) return setFormError("Choisissez une méthode de paiement");
                   setFormError("");
-                  book(listing, from, to, { ...info, paymentMethod: form.paymentMethod });
+                  await book(listing, from, to, { ...info, paymentMethod: form.paymentMethod });
                 }}>✓ Confirmer & Payer {total}€</button>
               </div>
             </>
