@@ -120,15 +120,12 @@ const DB = {
   get: (k) => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } },
   set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
   init: () => {
-    // Les comptes (lcy_users) sont désormais gérés par Firebase, plus besoin de les initialiser ici.
+    // Comptes, réservations, avis, messages et favoris sont gérés par Firebase.
     if (!localStorage.getItem("lcy_listings")) {
       DB.set("lcy_listings", []);
     }
     if (!localStorage.getItem("lcy_notifications")) DB.set("lcy_notifications", []);
     if (!localStorage.getItem("lcy_custom_cities")) localStorage.setItem("lcy_custom_cities", JSON.stringify({}));
-    if (!localStorage.getItem("lcy_reviews")) DB.set("lcy_reviews", []);
-    if (!localStorage.getItem("lcy_messages")) DB.set("lcy_messages", []);
-    if (!localStorage.getItem("lcy_favorites")) DB.set("lcy_favorites", []);
   },
 };
 
@@ -371,15 +368,36 @@ export default function App() {
     }, (err) => {
       console.log("Firebase bookings error:", err);
     });
-    return () => { unsub(); unsubUsers(); unsubBookings(); };
+    // 🔥 FIREBASE : écouter les avis en temps réel
+    const unsubReviews = onSnapshot(collection(db, "reviews"), (snapshot) => {
+      const fbReviews = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setReviews(fbReviews);
+      DB.set("lcy_reviews", fbReviews); // copie locale (pour les helpers de note)
+    }, (err) => {
+      console.log("Firebase reviews error:", err);
+    });
+    // 🔥 FIREBASE : écouter les messages en temps réel
+    const unsubMessages = onSnapshot(collection(db, "messages"), (snapshot) => {
+      const fbMessages = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setMessages(fbMessages);
+      DB.set("lcy_messages", fbMessages); // copie locale
+    }, (err) => {
+      console.log("Firebase messages error:", err);
+    });
+    // 🔥 FIREBASE : écouter les favoris en temps réel
+    const unsubFavorites = onSnapshot(collection(db, "favorites"), (snapshot) => {
+      const fbFavorites = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setFavorites(fbFavorites);
+      DB.set("lcy_favorites", fbFavorites); // copie locale (pour les helpers de favoris)
+    }, (err) => {
+      console.log("Firebase favorites error:", err);
+    });
+    return () => { unsub(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); };
   }, []);
 
   const reload = () => {
     setListings(DB.get("lcy_listings"));
     setNotifications(DB.get("lcy_notifications"));
-    setReviews(DB.get("lcy_reviews"));
-    setMessages(DB.get("lcy_messages"));
-    setFavorites(DB.get("lcy_favorites"));
   };
 
   const flash = (msg, color = "#10b981") => { setToast({ msg, color }); setTimeout(() => setToast(null), 3500); };
@@ -573,26 +591,34 @@ export default function App() {
   };
 
   // ⭐ Ajouter un avis
-  const addReview = (listingId, rating, comment) => {
-    const all = DB.get("lcy_reviews");
+  const addReview = async (listingId, rating, comment) => {
     const newR = { id: Date.now(), listingId, userId: user.id, userName: user.name, rating, comment, date: new Date().toISOString() };
-    DB.set("lcy_reviews", [...all, newR]);
+    try {
+      await addDoc(collection(db, "reviews"), newR);
+    } catch (e) {
+      console.log("Erreur ajout avis Firebase:", e);
+      flash("Erreur, réessayez", "#ef4444");
+      return;
+    }
     // Notifier le propriétaire
     const listing = listings.find(l => l.id === listingId);
     if (listing) addNotif(listing.ownerId, `⭐ ${user.name} a laissé un avis ${rating}/5 sur "${listing.title}"`, "review");
-    reload();
     flash("✓ Avis publié, merci !");
     setModal(null);
   };
 
   // 💬 Envoyer un message
-  const sendMessage = (listingId, toUserId, toUserName, text) => {
+  const sendMessage = async (listingId, toUserId, toUserName, text) => {
     if (!text.trim()) return;
-    const all = DB.get("lcy_messages");
     const newM = { id: Date.now(), conversationId: getConversationId(listingId, user.id, toUserId), listingId, fromId: user.id, fromName: user.name, toId: toUserId, toName: toUserName, text: text.trim(), date: new Date().toISOString(), read: false };
-    DB.set("lcy_messages", [...all, newM]);
+    try {
+      await addDoc(collection(db, "messages"), newM);
+    } catch (e) {
+      console.log("Erreur envoi message Firebase:", e);
+      flash("Erreur, réessayez", "#ef4444");
+      return;
+    }
     addNotif(toUserId, `💬 Nouveau message de ${user.name}`, "message");
-    reload();
   };
 
   const approveListing = async (fbId) => { try { await updateDoc(doc(db, "listings", fbId), { status: "approved" }); flash("Annonce approuvée"); } catch (e) { flash("Erreur", "#ef4444"); } };
@@ -637,13 +663,30 @@ export default function App() {
   const unreadMessagesCount = myMessages.filter(m => m.toId === user?.id && !m.read).length;
 
   const markAllRead = () => { DB.set("lcy_notifications", DB.get("lcy_notifications").map(n => n.userId === user.id ? { ...n, read: true } : n)); reload(); };
-  const markMessagesRead = (conversationId) => { DB.set("lcy_messages", DB.get("lcy_messages").map(m => m.conversationId === conversationId && m.toId === user.id ? { ...m, read: true } : m)); reload(); };
+  const markMessagesRead = async (conversationId) => {
+    // Trouver les messages non lus de cette conversation destinés à l'utilisateur courant
+    const toMark = messages.filter(m => m.conversationId === conversationId && m.toId === user.id && !m.read && m.fbId);
+    for (const m of toMark) {
+      try { await updateDoc(doc(db, "messages", m.fbId), { read: true }); } catch (e) { console.log("Erreur maj message lu:", e); }
+    }
+  };
   
-  const handleToggleFavorite = (listingId) => {
+  const handleToggleFavorite = async (listingId) => {
     if (!user) return setModal({ type: "login" });
-    const added = toggleFavorite(user.id, listingId);
-    reload();
-    flash(added ? "❤️ Ajouté aux favoris !" : "💔 Retiré des favoris");
+    // Chercher si ce favori existe déjà (dans les favoris Firebase chargés)
+    const existing = favorites.find(f => f.userId === user.id && f.listingId === listingId);
+    try {
+      if (existing && existing.fbId) {
+        await deleteDoc(doc(db, "favorites", existing.fbId));
+        flash("💔 Retiré des favoris");
+      } else {
+        await addDoc(collection(db, "favorites"), { id: Date.now(), userId: user.id, listingId, date: new Date().toISOString() });
+        flash("❤️ Ajouté aux favoris !");
+      }
+    } catch (e) {
+      console.log("Erreur favori Firebase:", e);
+      flash("Erreur, réessayez", "#ef4444");
+    }
   };
 
   return (
