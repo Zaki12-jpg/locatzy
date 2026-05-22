@@ -402,6 +402,41 @@ export default function App() {
     return () => { unsub(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); };
   }, []);
 
+  // 💳 Détecter le retour de paiement Stripe et créer la réservation
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paiement = params.get("paiement");
+    if (!paiement) return;
+    // Nettoyer l'adresse (enlever ?paiement=... de l'URL)
+    const cleanUrl = window.location.origin + window.location.pathname;
+
+    if (paiement === "annule") {
+      localStorage.removeItem("lcy_pending_payment");
+      flash("Paiement annulé", "#ef4444");
+      window.history.replaceState({}, "", cleanUrl);
+      return;
+    }
+
+    if (paiement === "reussi") {
+      const raw = localStorage.getItem("lcy_pending_payment");
+      if (!raw) { window.history.replaceState({}, "", cleanUrl); return; }
+      // Attendre que les annonces et l'utilisateur soient chargés
+      if (listings.length === 0 || !user) return;
+      try {
+        const pending = JSON.parse(raw);
+        // Supprimer TOUT DE SUITE pour éviter une double réservation si l'effet se redéclenche
+        localStorage.removeItem("lcy_pending_payment");
+        const listing = listings.find(l => l.id === pending.listingId);
+        if (listing) {
+          // Créer la réservation maintenant que le paiement est confirmé
+          book(listing, pending.from, pending.to, { ...pending.info, paymentMethod: "card", paid: true });
+        }
+      } catch (e) { console.log("Erreur création résa après paiement:", e); }
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, [listings, user]);
+
+
   const reload = () => {
     setListings(DB.get("lcy_listings"));
   };
@@ -558,9 +593,13 @@ export default function App() {
     }
   };
 
-  // 💳 Paiement Stripe : appelle le serveur /api/create-checkout puis redirige vers la page de paiement Stripe
-  const payerAvecStripe = async (listing, from, to, total) => {
+  // 💳 Paiement Stripe : mémorise la réservation, appelle le serveur, puis redirige vers Stripe
+  const payerAvecStripe = async (listing, from, to, total, info = {}) => {
     try {
+      // Mémoriser les détails de la réservation pour la créer au retour du paiement
+      localStorage.setItem("lcy_pending_payment", JSON.stringify({
+        listingId: listing.id, from, to, info, total,
+      }));
       const res = await fetch("/api/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2600,7 +2639,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   setFormError("");
                   if (form.paymentMethod === "card") {
                     // Paiement par carte → rediriger vers Stripe
-                    await payerAvecStripe(listing, from, to, total);
+                    await payerAvecStripe(listing, from, to, total, info);
                   } else {
                     // PayPal ou paiement sur place → réservation directe
                     await book(listing, from, to, { ...info, paymentMethod: form.paymentMethod });
