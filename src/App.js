@@ -558,6 +558,31 @@ export default function App() {
     }
   };
 
+  // 💳 Paiement Stripe : appelle le serveur /api/create-checkout puis redirige vers la page de paiement Stripe
+  const payerAvecStripe = async (listing, from, to, total) => {
+    try {
+      const res = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listingTitle: listing.title,
+          amount: total,
+          from,
+          to,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url; // redirige vers la page de paiement Stripe
+      } else {
+        flash("Erreur de paiement, réessayez", "#ef4444");
+      }
+    } catch (e) {
+      console.log("Erreur paiement Stripe:", e);
+      flash("Erreur de paiement, réessayez", "#ef4444");
+    }
+  };
+
   const book = async (listing, from, to, info = {}) => {
     if (!user) return setModal({ type: "login" });
     const conflict = findConflict(listing.id, from, to);
@@ -778,7 +803,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} book={book} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -2072,7 +2097,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, book, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -2573,7 +2598,13 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 <button className="btn btn-primary" style={{ flex: 2, background: "linear-gradient(135deg,#14b8a6,#0d9488)" }} onClick={async () => {
                   if (!form.paymentMethod) return setFormError("Choisissez une méthode de paiement");
                   setFormError("");
-                  await book(listing, from, to, { ...info, paymentMethod: form.paymentMethod });
+                  if (form.paymentMethod === "card") {
+                    // Paiement par carte → rediriger vers Stripe
+                    await payerAvecStripe(listing, from, to, total);
+                  } else {
+                    // PayPal ou paiement sur place → réservation directe
+                    await book(listing, from, to, { ...info, paymentMethod: form.paymentMethod });
+                  }
                 }}>✓ Confirmer & Payer {total}€</button>
               </div>
             </>
