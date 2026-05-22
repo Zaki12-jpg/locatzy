@@ -3,10 +3,10 @@ import { db, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, 
 
 // ════════════════════════════════════════════════════════════════════
 // LOCATZY — Plateforme mondiale de location (appartements & voitures)
-// Commission admin : 10% sur chaque réservation
+// Commission admin : 15% sur chaque réservation
 // ════════════════════════════════════════════════════════════════════
 
-const COMMISSION_RATE = 0.10;
+const COMMISSION_RATE = 0.15;
 
 // 📧 CONFIGURATION EMAILJS - Remplacez par vos vraies clés
 const EMAILJS_CONFIG = {
@@ -1835,7 +1835,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
               </div>
               <div style={{ background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 12, padding: 14, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                 <div><span style={{ color: "#6b7280" }}>Total :</span> <strong>{b.subtotal}€</strong></div>
-                <div><span style={{ color: "#6b7280" }}>Commission 10% :</span> <strong>-{b.commission}€</strong></div>
+                <div><span style={{ color: "#6b7280" }}>Commission 15% :</span> <strong>-{b.commission}€</strong></div>
                 <div><span style={{ color: "#0d9488" }}>💰 Gains :</span> <strong style={{ color: "#0d9488", fontSize: 16 }}>{b.ownerEarnings}€</strong></div>
               </div>
             </div>
@@ -1949,7 +1949,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 28 }}>
         <div className="card" style={{ padding: 24, background: "linear-gradient(135deg,#0a0a0a,#1a1a1a)", color: "white", border: "none" }}>
-          <div style={{ fontSize: 13, opacity: 0.7, fontWeight: 600 }}>💰 VOS COMMISSIONS (10%)</div>
+          <div style={{ fontSize: 13, opacity: 0.7, fontWeight: 600 }}>💰 VOS COMMISSIONS (15%)</div>
           <div className="display" style={{ fontSize: 38, fontWeight: 800, color: "#14b8a6" }}>{myCommission.toFixed(2)}€</div>
           <p style={{ fontSize: 12, opacity: 0.6 }}>Sur {totalRevenue.toFixed(2)}€ de transactions</p>
         </div>
@@ -2019,7 +2019,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
       {tab === "bookings" && (
         <div>
           <div style={{ background: "linear-gradient(135deg,#14b8a6,#0d9488)", borderRadius: 18, padding: 24, color: "white", marginBottom: 20 }}>
-            <p style={{ fontSize: 13, opacity: 0.9, fontWeight: 600 }}>TOTAL COMMISSIONS (10%)</p>
+            <p style={{ fontSize: 13, opacity: 0.9, fontWeight: 600 }}>TOTAL COMMISSIONS (15%)</p>
             <div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{myCommission.toFixed(2)}€</div>
             <p style={{ fontSize: 13, opacity: 0.9 }}>sur {bookings.length} réservation{bookings.length !== 1 ? "s" : ""}</p>
           </div>
