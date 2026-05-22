@@ -120,11 +120,10 @@ const DB = {
   get: (k) => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } },
   set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
   init: () => {
-    // Comptes, réservations, avis, messages et favoris sont gérés par Firebase.
+    // Tout (comptes, réservations, avis, messages, favoris, notifications) est géré par Firebase.
     if (!localStorage.getItem("lcy_listings")) {
       DB.set("lcy_listings", []);
     }
-    if (!localStorage.getItem("lcy_notifications")) DB.set("lcy_notifications", []);
     if (!localStorage.getItem("lcy_custom_cities")) localStorage.setItem("lcy_custom_cities", JSON.stringify({}));
   },
 };
@@ -392,18 +391,32 @@ export default function App() {
     }, (err) => {
       console.log("Firebase favorites error:", err);
     });
-    return () => { unsub(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); };
+    // 🔥 FIREBASE : écouter les notifications en temps réel
+    const unsubNotifications = onSnapshot(collection(db, "notifications"), (snapshot) => {
+      const fbNotifications = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setNotifications(fbNotifications);
+      DB.set("lcy_notifications", fbNotifications); // copie locale
+    }, (err) => {
+      console.log("Firebase notifications error:", err);
+    });
+    return () => { unsub(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); };
   }, []);
 
   const reload = () => {
     setListings(DB.get("lcy_listings"));
-    setNotifications(DB.get("lcy_notifications"));
   };
 
   const flash = (msg, color = "#10b981") => { setToast({ msg, color }); setTimeout(() => setToast(null), 3500); };
-  const addNotif = (uid, msg, type) => {
-    const all = DB.get("lcy_notifications");
-    DB.set("lcy_notifications", [...all, { id: Date.now() + Math.random(), userId: uid, message: msg, type, read: false, date: new Date().toISOString() }]);
+  // Trouver l'id du compte admin (pour lui envoyer les notifs de modération/commission)
+  const getAdminId = () => {
+    const admin = users.find(u => u.role === "admin");
+    return admin ? admin.id : null;
+  };
+  const addNotif = async (uid, msg, type) => {
+    if (!uid) return; // pas de destinataire valide
+    try {
+      await addDoc(collection(db, "notifications"), { id: Date.now() + Math.random(), userId: uid, message: msg, type, read: false, date: new Date().toISOString() });
+    } catch (e) { console.log("Erreur notification Firebase:", e); }
   };
   const sendEmail = (to, sub, body, params = {}) => {
     console.log(`📧 → ${to}\n${sub}\n${body}`);
@@ -535,7 +548,7 @@ export default function App() {
     try {
       // 🔥 Enregistrer l'annonce dans Firebase (partagée par tous)
       await addDoc(collection(db, "listings"), newL);
-      addNotif(1, `Nouvelle annonce à modérer : "${data.title}" par ${user.name}`, "moderation");
+      addNotif(getAdminId(), `Nouvelle annonce à modérer : "${data.title}" par ${user.name}`, "moderation");
       flash("✓ Annonce enregistrée ! En attente de validation par l'admin.");
       setModal(null);
       setPage("my");
@@ -583,7 +596,7 @@ export default function App() {
     }
     addNotif(listing.ownerId, `🎉 ${info.fullName || user.name} a réservé "${listing.title}" du ${from} au ${to} — Vous gagnez ${ownerEarnings}€`, "new_booking");
     sendEmail(listing.ownerEmail, `Nouvelle réservation Locatzy`, `${info.fullName || user.name} a réservé du ${from} au ${to}. Tél: ${info.phone || "—"}. Gain: ${ownerEarnings}€`);
-    addNotif(1, `💰 ${user.name} → "${listing.title}" — Commission : ${commission}€`, "commission");
+    addNotif(getAdminId(), `💰 ${user.name} → "${listing.title}" — Commission : ${commission}€`, "commission");
     sendEmail("blackberrywalid72@gmail.com", `Commission ${commission}€`, `Réservation: ${user.name} → ${listing.title}`);
     addNotif(user.id, `✓ Réservation confirmée : "${listing.title}" — Total ${subtotal}€`, "confirmation");
     flash(`✓ Réservation confirmée ! ${subtotal}€`);
@@ -662,7 +675,12 @@ export default function App() {
   const myMessages = user ? messages.filter(m => m.fromId === user.id || m.toId === user.id) : [];
   const unreadMessagesCount = myMessages.filter(m => m.toId === user?.id && !m.read).length;
 
-  const markAllRead = () => { DB.set("lcy_notifications", DB.get("lcy_notifications").map(n => n.userId === user.id ? { ...n, read: true } : n)); reload(); };
+  const markAllRead = async () => {
+    const toMark = notifications.filter(n => n.userId === user.id && !n.read && n.fbId);
+    for (const n of toMark) {
+      try { await updateDoc(doc(db, "notifications", n.fbId), { read: true }); } catch (e) { console.log("Erreur maj notif lue:", e); }
+    }
+  };
   const markMessagesRead = async (conversationId) => {
     // Trouver les messages non lus de cette conversation destinés à l'utilisateur courant
     const toMark = messages.filter(m => m.conversationId === conversationId && m.toId === user.id && !m.read && m.fbId);
