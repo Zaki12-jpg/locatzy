@@ -776,6 +776,31 @@ export default function App() {
     }
   };
 
+  // 🔗 Cliquer sur une notification → aller au bon endroit (comme Facebook)
+  const goToNotif = (notif) => {
+    const t = notif.type;
+    if (t === "moderation") {
+      // Annonce à modérer → Admin (l'onglet "à modérer" est par défaut quand on a du pending)
+      setPage("admin");
+    } else if (t === "commission") {
+      setPage("admin");
+    } else if (t === "payout") {
+      // Demande de versement → Admin versements
+      setPage("admin");
+    } else if (t === "message") {
+      setPage("messages");
+    } else if (t === "new_booking" || t === "confirmation" || t === "exchange" || t === "exchange_done" || t === "payout_done") {
+      // Tout ce qui concerne les réservations → page Mes réservations
+      setPage("my");
+    } else if (t === "review") {
+      // Avis → page Mes réservations (où l'utilisateur voit ses biens notés)
+      setPage("my");
+    } else {
+      setPage("my");
+    }
+  };
+
+
   // 🤝 Confirmation d'arrivée : le locataire et le propriétaire confirment chacun que l'échange a eu lieu
   const confirmExchange = async (booking, role) => {
     if (!booking.fbId) { flash("Erreur réservation", "#ef4444"); return; }
@@ -1001,7 +1026,7 @@ export default function App() {
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} setPage={setPage} />}
-      {page === "notif" && user && <NotifPage notifications={myNotifications} />}
+      {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} />}
@@ -2154,19 +2179,20 @@ function MessagesPage({ user, messages, listings, users, setModal, markMessagesR
 }
 
 // ─── NOTIF ───────────────────────────────────────────────────────────
-function NotifPage({ notifications }) {
+function NotifPage({ notifications, goToNotif }) {
   return (
     <div style={{ padding: "16px" }}>
       <h2 className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>🔔 Notifications</h2>
       {notifications.length === 0 ? <Empty icon="🔔" msg="Aucune notification" /> :
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {notifications.map(n => (
-            <div key={n.id} className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 14, opacity: n.read ? 0.7 : 1 }}>
-              <div style={{ fontSize: 24 }}>{n.type === "new_booking" ? "🎉" : n.type === "commission" ? "💰" : n.type === "moderation" ? "⏳" : n.type === "review" ? "⭐" : n.type === "message" ? "💬" : "✓"}</div>
+            <div key={n.id} onClick={() => goToNotif(n)} className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 14, opacity: n.read ? 0.7 : 1, cursor: "pointer", transition: "transform 0.1s" }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={e => e.currentTarget.style.transform = "scale(1)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
+              <div style={{ fontSize: 24 }}>{n.type === "new_booking" ? "🎉" : n.type === "commission" ? "💰" : n.type === "moderation" ? "⏳" : n.type === "review" ? "⭐" : n.type === "message" ? "💬" : n.type === "payout" ? "💸" : n.type === "payout_done" ? "✅" : n.type === "exchange" || n.type === "exchange_done" ? "🔑" : "✓"}</div>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 14, fontWeight: n.read ? 400 : 600 }}>{n.message}</p>
                 <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{new Date(n.date).toLocaleString("fr-FR")}</p>
               </div>
+              <span style={{ color: "#9ca3af", fontSize: 18 }}>›</span>
               {!n.read && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#14b8a6" }} />}
             </div>
           ))}
