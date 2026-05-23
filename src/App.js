@@ -605,8 +605,14 @@ export default function App() {
   const updateListing = async (listing, data) => {
     if (!listing.fbId) { flash("Erreur annonce", "#ef4444"); return; }
     try {
-      // L'annonce modifiée repasse en attente de validation par l'admin (plus sûr)
-      await updateDoc(doc(db, "listings", listing.fbId), { ...data, status: "pending" });
+      // Nettoyer les données : enlever fbId, et remplacer les undefined par des valeurs vides
+      // (Firebase refuse les valeurs "undefined")
+      const clean = {};
+      Object.keys(data).forEach(k => {
+        if (k === "fbId") return; // ne pas renvoyer le fbId dans les données
+        clean[k] = data[k] === undefined ? "" : data[k];
+      });
+      await updateDoc(doc(db, "listings", listing.fbId), { ...clean, status: "pending" });
       addNotif(getAdminId(), `Annonce modifiée à re-valider : "${data.title}" par ${user.name}`, "moderation");
       flash("✓ Annonce modifiée ! En attente de re-validation par l'admin.");
       setModal(null);
