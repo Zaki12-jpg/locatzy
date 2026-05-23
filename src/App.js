@@ -745,6 +745,43 @@ export default function App() {
       try { await updateDoc(doc(db, "notifications", n.fbId), { read: true }); } catch (e) { console.log("Erreur maj notif lue:", e); }
     }
   };
+
+  // 🤝 Confirmation d'arrivée : le locataire et le propriétaire confirment chacun que l'échange a eu lieu
+  const confirmExchange = async (booking, role) => {
+    if (!booking.fbId) { flash("Erreur réservation", "#ef4444"); return; }
+    try {
+      // role = "renter" (locataire) ou "owner" (propriétaire)
+      const champ = role === "renter" ? { renterConfirmed: true } : { ownerConfirmed: true };
+      await updateDoc(doc(db, "bookings", booking.fbId), champ);
+
+      // Calculer si les deux ont confirmé (en tenant compte de la confirmation actuelle)
+      const renterOk = role === "renter" ? true : booking.renterConfirmed;
+      const ownerOk = role === "owner" ? true : booking.ownerConfirmed;
+
+      if (role === "renter") {
+        // Le locataire vient de confirmer → prévenir le propriétaire
+        addNotif(booking.ownerId, `🔑 ${booking.renterName} a confirmé avoir récupéré la réservation "${booking.listingTitle}"`, "exchange");
+        sendEmail(booking.ownerEmail, "Le locataire a confirmé la récupération - Locatzy", `Bonjour,\n\n${booking.renterName} a confirmé avoir bien récupéré sa réservation pour "${booking.listingTitle}" (du ${booking.from} au ${booking.to}).\n\nL'équipe Locatzy`, { to_name: booking.ownerName });
+        flash("✅ Vous avez confirmé la récupération !");
+      } else {
+        // Le propriétaire vient de confirmer → prévenir le locataire
+        addNotif(booking.renterId, `🔑 ${booking.ownerName} a confirmé la remise pour "${booking.listingTitle}"`, "exchange");
+        sendEmail(booking.renterEmail, "Le propriétaire a confirmé la remise - Locatzy", `Bonjour,\n\n${booking.ownerName} a confirmé la remise de "${booking.listingTitle}" (du ${booking.from} au ${booking.to}).\n\nL'équipe Locatzy`, { to_name: booking.renterName });
+        flash("✅ Vous avez confirmé la remise !");
+      }
+
+      // Si les DEUX ont confirmé → échange validé
+      if (renterOk && ownerOk) {
+        await updateDoc(doc(db, "bookings", booking.fbId), { status: "exchange_done" });
+        addNotif(booking.renterId, `✓✓ Échange confirmé des deux côtés pour "${booking.listingTitle}" !`, "exchange_done");
+        addNotif(booking.ownerId, `✓✓ Échange confirmé des deux côtés pour "${booking.listingTitle}" !`, "exchange_done");
+      }
+    } catch (e) {
+      console.log("Erreur confirmExchange:", e);
+      flash("Erreur, réessayez", "#ef4444");
+    }
+  };
+
   const markMessagesRead = async (conversationId) => {
     // Trouver les messages non lus de cette conversation destinés à l'utilisateur courant
     const toMark = messages.filter(m => m.conversationId === conversationId && m.toId === user.id && !m.read && m.fbId);
@@ -871,7 +908,7 @@ export default function App() {
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
-      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} />}
+      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} />}
@@ -1796,12 +1833,14 @@ function Stars({ value, size = 16, onChange = null }) {
 }
 
 // ─── MY PAGE ─────────────────────────────────────────────────────────
-function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal, reviews, user }) {
+function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal, reviews, user, confirmExchange }) {
   const [tab, setTab] = useState("listings");
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
 
   // Trouver les réservations terminées (date départ passée) où l'user n'a pas encore noté
   const today = new Date(); today.setHours(0,0,0,0);
+  // Peut-on confirmer l'échange ? (à partir du jour d'arrivée)
+  const canConfirm = (b) => { const arrivee = new Date(b.from); arrivee.setHours(0,0,0,0); return today >= arrivee; };
   const reviewable = myBookingsAsRenter.filter(b => {
     if (new Date(b.to) > today) return false;
     return !reviews.find(r => r.userId === user.id && r.listingId === b.listingId);
@@ -1877,6 +1916,18 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
                 <div><span style={{ color: "#6b7280" }}>Commission 15% :</span> <strong>-{b.commission}€</strong></div>
                 <div><span style={{ color: "#0d9488" }}>💰 Gains :</span> <strong style={{ color: "#0d9488", fontSize: 16 }}>{b.ownerEarnings}€</strong></div>
               </div>
+              {/* 🤝 Confirmation d'échange côté propriétaire */}
+              {canConfirm(b) && (
+                <div style={{ marginTop: 12 }}>
+                  {b.ownerConfirmed ? (
+                    <div style={{ textAlign: "center", padding: 10, background: "#d1fae5", borderRadius: 10, color: "#065f46", fontWeight: 700, fontSize: 13 }}>
+                      ✅ Vous avez confirmé la remise{b.renterConfirmed ? " · Échange validé des deux côtés ✓✓" : " · En attente du locataire"}
+                    </div>
+                  ) : (
+                    <button className="btn btn-primary" style={{ width: "100%", background: "linear-gradient(135deg,#14b8a6,#0d9488)" }} onClick={() => confirmExchange(b, "owner")}>🔑 Confirmer la remise des clés / du bien</button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1897,6 +1948,18 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
                   <Status status={b.status} />
                 </div>
               </div>
+              {/* 🤝 Confirmation d'échange côté locataire */}
+              {canConfirm(b) && (
+                <div style={{ marginTop: 12 }}>
+                  {b.renterConfirmed ? (
+                    <div style={{ textAlign: "center", padding: 10, background: "#d1fae5", borderRadius: 10, color: "#065f46", fontWeight: 700, fontSize: 13 }}>
+                      ✅ Vous avez confirmé la récupération{b.ownerConfirmed ? " · Échange validé des deux côtés ✓✓" : " · En attente du propriétaire"}
+                    </div>
+                  ) : (
+                    <button className="btn btn-primary" style={{ width: "100%", background: "linear-gradient(135deg,#14b8a6,#0d9488)" }} onClick={() => confirmExchange(b, "renter")}>🏠 J'ai bien récupéré ma réservation</button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -2871,7 +2934,7 @@ function BookingCalendar({ listing, user, book, setModal }) {
 
 // ─── HELPERS ────────────────────────────────────────────────────────
 function Status({ status }) {
-  const m = { approved: ["#d1fae5","#065f46","✓ APPROUVÉE"], pending: ["#fef3c7","#92400e","⏳ EN ATTENTE"], rejected: ["#fee2e2","#991b1b","✗ REFUSÉE"], confirmed: ["#cffafe","#155e75","✓ CONFIRMÉE"] };
+  const m = { approved: ["#d1fae5","#065f46","✓ APPROUVÉE"], pending: ["#fef3c7","#92400e","⏳ EN ATTENTE"], rejected: ["#fee2e2","#991b1b","✗ REFUSÉE"], confirmed: ["#cffafe","#155e75","✓ CONFIRMÉE"], exchange_done: ["#d1fae5","#065f46","✓✓ ÉCHANGE CONFIRMÉ"] };
   const [bg, c, l] = m[status] || ["#f3f4f6","#374151",status];
   return <span className="badge" style={{ background: bg, color: c }}>{l}</span>;
 }
