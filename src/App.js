@@ -300,6 +300,7 @@ export default function App() {
   const [reviews, setReviews] = useState([]);
   const [messages, setMessages] = useState([]);
   const [favorites, setFavorites] = useState([]);
+  const [payouts, setPayouts] = useState([]);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("lcy_dark") === "true");
   
   const toggleDarkMode = () => {
@@ -399,7 +400,14 @@ export default function App() {
     }, (err) => {
       console.log("Firebase notifications error:", err);
     });
-    return () => { unsub(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); };
+    // 🔥 FIREBASE : écouter les demandes de versement
+    const unsubPayouts = onSnapshot(collection(db, "payouts"), (snapshot) => {
+      const fbPayouts = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setPayouts(fbPayouts);
+    }, (err) => {
+      console.log("Firebase payouts error:", err);
+    });
+    return () => { unsub(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); unsubPayouts(); };
   }, []);
 
   // 💳 Détecter le retour de paiement Stripe et créer la réservation
@@ -789,6 +797,68 @@ export default function App() {
       try { await updateDoc(doc(db, "messages", m.fbId), { read: true }); } catch (e) { console.log("Erreur maj message lu:", e); }
     }
   };
+
+  // 💸 Admin : marquer une demande de versement comme payée
+  const markPayoutPaid = async (payout) => {
+    if (!payout.fbId) return;
+    try {
+      await updateDoc(doc(db, "payouts", payout.fbId), { status: "paid", paidAt: new Date().toISOString() });
+      addNotif(payout.ownerId, `✅ Votre versement de ${payout.amount}€ pour "${payout.listingTitle}" a été effectué !`, "payout_done");
+      sendEmail(payout.ownerEmail, `Versement effectué - Locatzy`, `Bonjour ${payout.ownerName},\n\nVotre versement de ${payout.amount}€ pour "${payout.listingTitle}" a été effectué.\n\nL'équipe Locatzy`, { to_name: payout.ownerName });
+      flash("✅ Versement marqué comme payé");
+    } catch (e) { console.log("Erreur markPayoutPaid:", e); flash("Erreur", "#ef4444"); }
+  };
+
+  // 🏦 Enregistrer les infos de paiement du propriétaire (RIB ou Wafacash)
+  const updatePaymentInfo = async (paymentInfo) => {
+    if (!user || !user.fbId) { flash("Erreur compte", "#ef4444"); return; }
+    try {
+      await updateDoc(doc(db, "users", user.fbId), { paymentInfo });
+      // Mettre à jour la session locale
+      const updatedUser = { ...user, paymentInfo };
+      setUser(updatedUser);
+      localStorage.setItem("lcy_session", JSON.stringify(updatedUser));
+      flash("✅ Infos de paiement enregistrées !");
+    } catch (e) {
+      console.log("Erreur updatePaymentInfo:", e);
+      flash("Erreur, réessayez", "#ef4444");
+    }
+  };
+
+  // 💰 Demander le versement de ses gains pour une réservation
+  const requestPayout = async (booking) => {
+    // Vérifier que le propriétaire a bien renseigné ses infos de paiement
+    if (!user.paymentInfo || (!user.paymentInfo.rib && !user.paymentInfo.wafacash)) {
+      flash("Renseignez d'abord vos infos de paiement dans votre profil", "#ef4444");
+      setPage("profile");
+      return;
+    }
+    try {
+      await addDoc(collection(db, "payouts"), {
+        id: Date.now(),
+        bookingId: booking.id,
+        bookingFbId: booking.fbId || "",
+        listingTitle: booking.listingTitle,
+        ownerId: user.id,
+        ownerName: user.name,
+        ownerEmail: user.email,
+        amount: booking.ownerEarnings,
+        paymentInfo: user.paymentInfo,
+        status: "pending", // pending → paid
+        requestedAt: new Date().toISOString(),
+      });
+      // Marquer la réservation comme "versement demandé"
+      if (booking.fbId) { await updateDoc(doc(db, "bookings", booking.fbId), { payoutRequested: true }); }
+      // Prévenir l'admin
+      addNotif(getAdminId(), `💸 ${user.name} demande un versement de ${booking.ownerEarnings}€ pour "${booking.listingTitle}"`, "payout");
+      sendEmail("blackberrywalid72@gmail.com", `Demande de versement ${booking.ownerEarnings}€`, `${user.name} demande le versement de ${booking.ownerEarnings}€ pour "${booking.listingTitle}".`);
+      flash("✅ Demande de versement envoyée !");
+    } catch (e) {
+      console.log("Erreur requestPayout:", e);
+      flash("Erreur, réessayez", "#ef4444");
+    }
+  };
+
   
   const handleToggleFavorite = async (listingId) => {
     if (!user) return setModal({ type: "login" });
@@ -908,11 +978,11 @@ export default function App() {
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
-      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} />}
+      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} setPage={setPage} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
-      {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} />}
-      {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} />}
+      {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} />}
+      {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} />}
       {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} onToggleFav={handleToggleFavorite} setModal={setModal} /> }
 
       {/* BOTTOM NAV FIXED - Mobile uniquement */}
@@ -969,8 +1039,12 @@ function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggl
   );
 }
 
-function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode }) {
+function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode, updatePaymentInfo }) {
   if (!user) return null;
+  const [payMethod, setPayMethod] = useState(user.paymentInfo?.method || "rib");
+  const [payName, setPayName] = useState(user.paymentInfo?.fullName || "");
+  const [payRib, setPayRib] = useState(user.paymentInfo?.rib || "");
+  const [payWafa, setPayWafa] = useState(user.paymentInfo?.wafacash || "");
   return (
     <div style={{ padding: "20px 16px" }}>
       <h2 className="display" style={{ fontSize: 26, fontWeight: 800, marginBottom: 20 }}>👤 Mon profil</h2>
@@ -1007,6 +1081,36 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
           </div>
         );
       })()}
+      {/* 🏦 INFOS DE PAIEMENT (pour recevoir les versements) */}
+      <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+        <h3 style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>🏦 Mes infos de paiement</h3>
+        <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>Pour recevoir vos gains quand un locataire confirme sa réservation.</p>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button onClick={() => setPayMethod("rib")} style={{ flex: 1, padding: 10, borderRadius: 10, border: payMethod === "rib" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: payMethod === "rib" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>🏦 Compte bancaire (RIB)</button>
+          <button onClick={() => setPayMethod("wafacash")} style={{ flex: 1, padding: 10, borderRadius: 10, border: payMethod === "wafacash" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: payMethod === "wafacash" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>💵 Wafacash</button>
+        </div>
+
+        <input value={payName} onChange={e => setPayName(e.target.value)} placeholder="Nom et prénom" style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #e5e7eb", marginBottom: 10, fontSize: 14, boxSizing: "border-box" }} />
+
+        {payMethod === "rib" ? (
+          <input value={payRib} onChange={e => setPayRib(e.target.value)} placeholder="Votre RIB (24 chiffres)" style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #e5e7eb", marginBottom: 10, fontSize: 14, boxSizing: "border-box" }} />
+        ) : (
+          <input value={payWafa} onChange={e => setPayWafa(e.target.value)} placeholder="Numéro de téléphone Wafacash" style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #e5e7eb", marginBottom: 10, fontSize: 14, boxSizing: "border-box" }} />
+        )}
+
+        <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => {
+          if (!payName.trim()) return alert("Entrez votre nom et prénom");
+          if (payMethod === "rib" && !payRib.trim()) return alert("Entrez votre RIB");
+          if (payMethod === "wafacash" && !payWafa.trim()) return alert("Entrez votre numéro Wafacash");
+          updatePaymentInfo({ method: payMethod, fullName: payName.trim(), rib: payMethod === "rib" ? payRib.trim() : "", wafacash: payMethod === "wafacash" ? payWafa.trim() : "" });
+        }}>💾 Enregistrer mes infos</button>
+
+        {user.paymentInfo && (user.paymentInfo.rib || user.paymentInfo.wafacash) && (
+          <p style={{ fontSize: 12, color: "#0d9488", marginTop: 10, fontWeight: 600, textAlign: "center" }}>✅ Infos enregistrées ({user.paymentInfo.method === "rib" ? "RIB" : "Wafacash"})</p>
+        )}
+      </div>
+
       <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setPage("favorites")}>
         <span>❤️ Mes favoris</span>
         <span>›</span>
@@ -1833,7 +1937,7 @@ function Stars({ value, size = 16, onChange = null }) {
 }
 
 // ─── MY PAGE ─────────────────────────────────────────────────────────
-function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal, reviews, user, confirmExchange }) {
+function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal, reviews, user, confirmExchange, requestPayout, setPage }) {
   const [tab, setTab] = useState("listings");
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
 
@@ -1925,6 +2029,18 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
                     </div>
                   ) : (
                     <button className="btn btn-primary" style={{ width: "100%", background: "linear-gradient(135deg,#14b8a6,#0d9488)" }} onClick={() => confirmExchange(b, "owner")}>🔑 Confirmer la remise des clés / du bien</button>
+                  )}
+                </div>
+              )}
+              {/* 💰 Demander le versement : apparaît dès que le LOCATAIRE a confirmé avoir reçu */}
+              {b.renterConfirmed && (
+                <div style={{ marginTop: 10 }}>
+                  {b.payoutRequested ? (
+                    <div style={{ textAlign: "center", padding: 10, background: "#fef3c7", borderRadius: 10, color: "#92400e", fontWeight: 700, fontSize: 13 }}>
+                      💸 Versement demandé — en cours de traitement
+                    </div>
+                  ) : (
+                    <button className="btn btn-primary" style={{ width: "100%", background: "linear-gradient(135deg,#f59e0b,#d97706)" }} onClick={() => requestPayout(b)}>💰 Demander le versement de mes gains ({b.ownerEarnings}€)</button>
                   )}
                 </div>
               )}
@@ -2036,7 +2152,7 @@ function NotifPage({ notifications }) {
 }
 
 // ─── ADMIN ───────────────────────────────────────────────────────────
-function Admin({ listings, bookings, users, approveListing, rejectListing, deleteListing, deleteUser, reviews }) {
+function Admin({ listings, bookings, users, approveListing, rejectListing, deleteListing, deleteUser, reviews, payouts, markPayoutPaid }) {
   const [tab, setTab] = useState("dashboard");
   const pending = listings.filter(l => l.status === "pending");
   const totalRevenue = bookings.reduce((s, b) => s + b.subtotal, 0);
@@ -2065,7 +2181,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        {[["dashboard","📊 Vue d'ensemble"],["pending",`⏳ À modérer (${pending.length})`],["bookings","💰 Réservations"],["listings","📋 Annonces"],["users","👥 Users"],["reviews",`⭐ Avis (${reviews.length})`]].map(([v,l]) => <button key={v} className={`pill ${tab === v ? "active" : ""}`} onClick={() => setTab(v)}>{l}</button>)}
+        {[["dashboard","📊 Vue d'ensemble"],["pending",`⏳ À modérer (${pending.length})`],["bookings","💰 Réservations"],["payouts",`💸 Versements (${payouts.filter(p => p.status === "pending").length})`],["listings","📋 Annonces"],["users","👥 Users"],["reviews",`⭐ Avis (${reviews.length})`]].map(([v,l]) => <button key={v} className={`pill ${tab === v ? "active" : ""}`} onClick={() => setTab(v)}>{l}</button>)}
       </div>
 
       {tab === "dashboard" && (
@@ -2138,6 +2254,38 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {tab === "payouts" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {payouts.length === 0 ? <Empty icon="💸" msg="Aucune demande de versement" /> : [...payouts].sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt)).map(p => (
+            <div key={p.id} className="card" style={{ padding: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                <div>
+                  <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{p.ownerName}</h3>
+                  <p style={{ fontSize: 13, color: "#6b7280" }}>📋 {p.listingTitle}</p>
+                  <p style={{ fontSize: 12, color: "#6b7280" }}>📧 {p.ownerEmail}</p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div className="display" style={{ fontWeight: 800, fontSize: 22, color: "#f59e0b" }}>{p.amount}€</div>
+                  <span className="badge" style={{ background: p.status === "paid" ? "#d1fae5" : "#fef3c7", color: p.status === "paid" ? "#065f46" : "#92400e" }}>{p.status === "paid" ? "✓ PAYÉ" : "⏳ À VERSER"}</span>
+                </div>
+              </div>
+              <div style={{ background: "#f9fafb", borderRadius: 10, padding: 12, fontSize: 13, marginBottom: 10 }}>
+                <p style={{ fontWeight: 700, marginBottom: 4 }}>💳 Coordonnées de versement :</p>
+                <p>👤 {p.paymentInfo?.fullName}</p>
+                {p.paymentInfo?.method === "rib" ? (
+                  <p>🏦 RIB : <strong>{p.paymentInfo?.rib}</strong></p>
+                ) : (
+                  <p>💵 Wafacash : <strong>{p.paymentInfo?.wafacash}</strong></p>
+                )}
+              </div>
+              {p.status !== "paid" && (
+                <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => markPayoutPaid(p)}>✅ Marquer comme payé</button>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
