@@ -958,6 +958,12 @@ export default function App() {
           .detail-grid { display: grid !important; grid-template-columns: 2fr 1fr; gap: 40px; }
         }
 
+        /* Galerie produit : taille moyenne sur PC (sur téléphone elle reste pleine largeur) */
+        @media (min-width: 768px) {
+          .detail-gallery { max-width: 680px !important; max-height: 400px !important; }
+          .detail-gallery .detail-main-photo { height: 400px !important; }
+        }
+
         /* GRAND ÉCRAN (1440px+) */
         @media (min-width: 1440px) {
           .listings-grid { grid-template-columns: repeat(4, 1fr) !important; }
@@ -1672,9 +1678,9 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
       </div>
 
       {/* Galerie photos */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, marginBottom: 32, borderRadius: 20, overflow: "hidden", maxHeight: 460 }}>
+      <div className="detail-gallery" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, marginBottom: 32, borderRadius: 20, overflow: "hidden", maxHeight: 460 }}>
         {/* Photo principale */}
-        <div style={{ background: PROPERTY_TYPES[l.type]?.bgGradient || "#f3f4f6", height: 460, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }} onClick={() => setShowAllPhotos(true)}>
+        <div className="detail-main-photo" style={{ background: PROPERTY_TYPES[l.type]?.bgGradient || "#f3f4f6", height: 460, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }} onClick={() => setShowAllPhotos(true)}>
           {isImage ? <img src={photo} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 140 }}>{photo || PROPERTY_TYPES[l.type]?.icon || "🏠"}</span>}
         </div>
         {/* Mini-grille */}
