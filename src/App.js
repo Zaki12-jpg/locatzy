@@ -964,6 +964,12 @@ export default function App() {
           .detail-gallery .detail-main-photo { height: 400px !important; }
         }
 
+        /* Page produit : galerie à gauche + infos à droite sur PC (empilé sur téléphone) */
+        @media (min-width: 900px) {
+          .detail-top-grid { display: grid !important; grid-template-columns: 1.3fr 1fr !important; gap: 32px !important; align-items: start !important; }
+          .detail-top-grid .detail-gallery { max-width: 100% !important; }
+        }
+
         /* GRAND ÉCRAN (1440px+) */
         @media (min-width: 1440px) {
           .listings-grid { grid-template-columns: repeat(4, 1fr) !important; }
@@ -1677,25 +1683,59 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
         <span style={{ color: "#374151" }}>📍 {l.city}, {l.country}</span>
       </div>
 
-      {/* Galerie photos */}
-      <div className="detail-gallery" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, marginBottom: 32, borderRadius: 20, overflow: "hidden", maxHeight: 460 }}>
-        {/* Photo principale */}
-        <div className="detail-main-photo" style={{ background: PROPERTY_TYPES[l.type]?.bgGradient || "#f3f4f6", height: 460, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }} onClick={() => setShowAllPhotos(true)}>
+      {/* Conteneur 2 colonnes sur PC : galerie à gauche, infos à droite */}
+      <div className="detail-top-grid">
+      {/* Galerie photos : grande image avec flèches + swipe + miniatures */}
+      <div className="detail-gallery" style={{ marginBottom: 32 }}>
+        {/* Photo principale avec navigation */}
+        <div
+          className="detail-main-photo"
+          style={{ background: PROPERTY_TYPES[l.type]?.bgGradient || "#f3f4f6", height: 460, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", borderRadius: 20, overflow: "hidden" }}
+          onClick={() => setShowAllPhotos(true)}
+          onTouchStart={(e) => { e.currentTarget.dataset.touchx = e.touches[0].clientX; }}
+          onTouchEnd={(e) => {
+            const startX = parseFloat(e.currentTarget.dataset.touchx || "0");
+            const diff = e.changedTouches[0].clientX - startX;
+            if (Math.abs(diff) > 40) {
+              e.stopPropagation();
+              if (diff < 0) setPhotoIdx((photoIdx + 1) % l.photos.length); // glisse gauche → suivant
+              else setPhotoIdx((photoIdx - 1 + l.photos.length) % l.photos.length); // glisse droite → précédent
+            }
+          }}
+        >
           {isImage ? <img src={photo} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 140 }}>{photo || PROPERTY_TYPES[l.type]?.icon || "🏠"}</span>}
+
+          {/* Flèches de navigation (si plusieurs photos) */}
+          {l.photos.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); setPhotoIdx((photoIdx - 1 + l.photos.length) % l.photos.length); }}
+                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.9)", borderRadius: "50%", width: 42, height: 42, fontSize: 20, fontWeight: 700, color: "#0a0a0a", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                aria-label="Photo précédente"
+              >‹</button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setPhotoIdx((photoIdx + 1) % l.photos.length); }}
+                style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.9)", borderRadius: "50%", width: 42, height: 42, fontSize: 20, fontWeight: 700, color: "#0a0a0a", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                aria-label="Photo suivante"
+              >›</button>
+              {/* Compteur */}
+              <div style={{ position: "absolute", bottom: 12, right: 12, background: "rgba(0,0,0,0.6)", color: "white", padding: "4px 12px", borderRadius: 50, fontSize: 13, fontWeight: 600 }}>{photoIdx + 1} / {l.photos.length}</div>
+            </>
+          )}
         </div>
-        {/* Mini-grille */}
+
+        {/* Miniatures cliquables en bas */}
         {l.photos.length > 1 && (
-          <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 8 }}>
-            {l.photos.slice(1, 3).map((p, i) => {
+          <div style={{ display: "flex", gap: 8, marginTop: 10, overflowX: "auto", paddingBottom: 4 }}>
+            {l.photos.map((p, i) => {
               const isImg = p.startsWith && p.startsWith("data:");
               return (
-                <div key={i} style={{ background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", position: "relative" }} onClick={() => { setPhotoIdx(i + 1); setShowAllPhotos(true); }}>
-                  {isImg ? <img src={p} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 60 }}>{p}</span>}
-                  {i === 1 && l.photos.length > 3 && (
-                    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 18 }}>
-                      +{l.photos.length - 3} photos
-                    </div>
-                  )}
+                <div
+                  key={i}
+                  onClick={() => setPhotoIdx(i)}
+                  style={{ flexShrink: 0, width: 70, height: 70, borderRadius: 10, overflow: "hidden", cursor: "pointer", border: photoIdx === i ? "3px solid #14b8a6" : "2px solid #e5e7eb", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  {isImg ? <img src={p} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 32 }}>{p}</span>}
                 </div>
               );
             })}
@@ -1720,37 +1760,41 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
         </div>
       )}
 
-      {/* Grille principale : infos + sidebar réservation */}
+      {/* Bloc infos à droite de la galerie (sur PC) */}
+      <div className="detail-info-side">
+        {/* Type + caractéristiques */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 20, borderBottom: "1px solid #e5e7eb", marginBottom: 24 }}>
+          <div>
+            <h2 className="display" style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{PROPERTY_TYPES[l.type]?.icon} {PROPERTY_TYPES[l.type]?.labelFull || l.type}</h2>
+            <p style={{ color: "#6b7280", fontSize: 14 }}>{isLodging(l.type) ? `${l.rooms} chambre${l.rooms > 1 ? "s" : ""} · ${l.guests} personnes max` : `${l.seats} places`}</p>
+          </div>
+          <div style={{ width: 54, height: 54, borderRadius: "50%", background: "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 22 }}>{l.ownerName[0]}</div>
+        </div>
+
+        {/* CARTE RÉSERVATION */}
+        <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 20, padding: 20, boxShadow: "0 8px 28px rgba(0,0,0,0.08)", marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+            <span className="display" style={{ fontSize: 26, fontWeight: 800 }}>{l.price}€</span>
+            <span style={{ color: "#6b7280", fontSize: 14 }}>/ jour</span>
+          </div>
+          {rating.count > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16, fontSize: 13 }}>
+              <Stars value={rating.avg} size={14} />
+              <strong>{rating.avg}</strong>
+              <span style={{ color: "#6b7280" }}>· {rating.count} avis</span>
+            </div>
+          )}
+          <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 Réserver maintenant</button>
+          <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={() => user ? setModal({ type: "contactOwner", data: l }) : setModal({ type: "login" })}>💬 Contacter le propriétaire</button>
+          <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10 }}>🛡 Vous ne paierez rien maintenant · Sécurisé par Locatzy</p>
+        </div>
+      </div>
+      </div>{/* fin detail-top-grid */}
+
+      {/* Grille principale : reste des infos */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 40 }}>
         {/* Colonne gauche : infos */}
         <div>
-          {/* Type + caractéristiques */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 20, borderBottom: "1px solid #e5e7eb", marginBottom: 24 }}>
-            <div>
-              <h2 className="display" style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{PROPERTY_TYPES[l.type]?.icon} {PROPERTY_TYPES[l.type]?.labelFull || l.type}</h2>
-              <p style={{ color: "#6b7280", fontSize: 14 }}>{isLodging(l.type) ? `${l.rooms} chambre${l.rooms > 1 ? "s" : ""} · ${l.guests} personnes max` : `${l.seats} places`}</p>
-            </div>
-            <div style={{ width: 54, height: 54, borderRadius: "50%", background: "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 22 }}>{l.ownerName[0]}</div>
-          </div>
-
-          {/* CARTE RÉSERVATION (placée en haut, sous les caractéristiques) */}
-          <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 20, padding: 20, boxShadow: "0 8px 28px rgba(0,0,0,0.08)", marginBottom: 28 }}>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
-              <span className="display" style={{ fontSize: 26, fontWeight: 800 }}>{l.price}€</span>
-              <span style={{ color: "#6b7280", fontSize: 14 }}>/ jour</span>
-            </div>
-            {rating.count > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16, fontSize: 13 }}>
-                <Stars value={rating.avg} size={14} />
-                <strong>{rating.avg}</strong>
-                <span style={{ color: "#6b7280" }}>· {rating.count} avis</span>
-              </div>
-            )}
-            <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 Réserver maintenant</button>
-            <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={() => user ? setModal({ type: "contactOwner", data: l }) : setModal({ type: "login" })}>💬 Contacter le propriétaire</button>
-            <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10 }}>🛡 Vous ne paierez rien maintenant · Sécurisé par Locatzy</p>
-          </div>
-
           {/* Description */}
           <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>À propos de ce bien</h3>
           <p style={{ color: "#374151", fontSize: 15, lineHeight: 1.7, marginBottom: 24, whiteSpace: "pre-wrap" }}>{l.desc}</p>
