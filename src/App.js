@@ -601,6 +601,22 @@ export default function App() {
     }
   };
 
+  // ✏️ Modifier une annonce existante
+  const updateListing = async (listing, data) => {
+    if (!listing.fbId) { flash("Erreur annonce", "#ef4444"); return; }
+    try {
+      // L'annonce modifiée repasse en attente de validation par l'admin (plus sûr)
+      await updateDoc(doc(db, "listings", listing.fbId), { ...data, status: "pending" });
+      addNotif(getAdminId(), `Annonce modifiée à re-valider : "${data.title}" par ${user.name}`, "moderation");
+      flash("✓ Annonce modifiée ! En attente de re-validation par l'admin.");
+      setModal(null);
+      setPage("my");
+    } catch (err) {
+      console.log("Erreur modification annonce Firebase:", err);
+      flash("Erreur lors de la modification. Réessayez.", "#ef4444");
+    }
+  };
+
   // 💳 Paiement Stripe : mémorise la réservation, appelle le serveur, puis redirige vers Stripe
   const payerAvecStripe = async (listing, from, to, total, info = {}) => {
     try {
@@ -949,7 +965,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -1989,14 +2005,17 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
             const isImg = photo && photo.startsWith && photo.startsWith("data:");
             const r = getListingRating(l.id);
             return (
-              <div key={l.id} className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 18 }}>
-                <div className="photo-thumb">{isImg ? <img src={photo} alt="" /> : <span style={{ fontSize: 32 }}>{photo}</span>}</div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ fontWeight: 700 }}>{l.title}</h3>
-                  <p style={{ color: "#6b7280", fontSize: 13 }}>📍 {l.city}, {l.country} · {l.price}€/j</p>
-                  {r.count > 0 && <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}><Stars value={r.avg} size={12} /><span style={{ fontSize: 12, color: "#6b7280" }}>{r.avg} ({r.count})</span></div>}
+              <div key={l.id} className="card" style={{ padding: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+                  <div className="photo-thumb">{isImg ? <img src={photo} alt="" /> : <span style={{ fontSize: 32 }}>{photo}</span>}</div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontWeight: 700 }}>{l.title}</h3>
+                    <p style={{ color: "#6b7280", fontSize: 13 }}>📍 {l.city}, {l.country} · {l.price}€/j</p>
+                    {r.count > 0 && <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}><Stars value={r.avg} size={12} /><span style={{ fontSize: 12, color: "#6b7280" }}>{r.avg} ({r.count})</span></div>}
+                  </div>
+                  <Status status={l.status} />
                 </div>
-                <Status status={l.status} />
+                <button className="btn btn-ghost" style={{ width: "100%", marginTop: 12, border: "2px solid #14b8a6", color: "#0d9488", fontWeight: 700 }} onClick={() => setModal({ type: "edit", data: l })}>✏️ Modifier cette annonce</button>
               </div>
             );
           })}
@@ -2347,7 +2366,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -2361,6 +2380,13 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
         fullName: f.fullName || user.name || "",
         bookingEmail: f.bookingEmail || user.email || "",
       }));
+    }
+    // ✏️ Pré-remplir le formulaire avec l'annonce à modifier
+    if (modal?.type === "edit" && modal.data) {
+      const l = modal.data;
+      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "" });
+      // Pré-charger les photos existantes (sauf si c'est juste un emoji par défaut)
+      setPhotos(Array.isArray(l.photos) && l.photos.length > 0 && l.photos[0].startsWith("data:") ? l.photos : []);
     }
   }, [modal?.type, user]);
 
@@ -2544,9 +2570,9 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
           </>
         )}
 
-        {modal.type === "add" && user && (
+        {(modal.type === "add" || modal.type === "edit") && user && (
           <>
-            <h2 className="display" style={{ fontWeight: 800, fontSize: 26, marginBottom: 8 }}>📝 Publier une annonce</h2>
+            <h2 className="display" style={{ fontWeight: 800, fontSize: 26, marginBottom: 8 }}>{modal.type === "edit" ? "✏️ Modifier l'annonce" : "📝 Publier une annonce"}</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Type *</label>
                 <select className="input" value={form.type || ""} onChange={e => set("type", e.target.value)}>
@@ -2691,8 +2717,13 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 if (isVehicle(form.type) && !form.transmission) return setFormError("Type de transmission obligatoire");
                 const finalCity = form.city === "__other__" ? form.customCity.trim() : form.city;
                 if (form.city === "__other__") addCustomCity(form.country, finalCity);
-                addListing({ ...form, city: finalCity, photos: photos.length > 0 ? photos : [PROPERTY_TYPES[form.type]?.icon || "🏠"] });
-              }}>✓ Soumettre</button>
+                const finalData = { ...form, city: finalCity, photos: photos.length > 0 ? photos : [PROPERTY_TYPES[form.type]?.icon || "🏠"] };
+                if (modal.type === "edit") {
+                  updateListing(modal.data, finalData);
+                } else {
+                  addListing(finalData);
+                }
+              }}>{modal.type === "edit" ? "✓ Enregistrer les modifications" : "✓ Soumettre"}</button>
             </div>
           </>
         )}
