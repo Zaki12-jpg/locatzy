@@ -2710,6 +2710,17 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
               </div>
               {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
               <button className="btn btn-primary" style={{ padding: "14px 24px", fontSize: 15 }} onClick={() => {
+                if (modal.type === "edit") {
+                  // En modification : validations souples (le reste est déjà pré-rempli)
+                  if (!form.title || !form.title.trim()) return setFormError("Le titre ne peut pas être vide");
+                  if (!form.price || form.price <= 0) return setFormError("Le prix doit être supérieur à 0");
+                  const finalCityEdit = form.city === "__other__" ? (form.customCity || "").trim() : form.city;
+                  if (form.city === "__other__" && finalCityEdit) addCustomCity(form.country, finalCityEdit);
+                  const finalDataEdit = { ...form, city: finalCityEdit || form.city, photos: photos.length > 0 ? photos : [PROPERTY_TYPES[form.type]?.icon || "🏠"] };
+                  updateListing(modal.data, finalDataEdit);
+                  return;
+                }
+                // En création : toutes les validations obligatoires
                 if (!form.type) return setFormError("Choisir un type");
                 if (!form.title || !form.title.trim()) return setFormError("Titre obligatoire");
                 if (!form.country) return setFormError("Pays obligatoire");
@@ -2724,11 +2735,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 const finalCity = form.city === "__other__" ? form.customCity.trim() : form.city;
                 if (form.city === "__other__") addCustomCity(form.country, finalCity);
                 const finalData = { ...form, city: finalCity, photos: photos.length > 0 ? photos : [PROPERTY_TYPES[form.type]?.icon || "🏠"] };
-                if (modal.type === "edit") {
-                  updateListing(modal.data, finalData);
-                } else {
-                  addListing(finalData);
-                }
+                addListing(finalData);
               }}>{modal.type === "edit" ? "✓ Enregistrer les modifications" : "✓ Soumettre"}</button>
             </div>
           </>
