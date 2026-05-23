@@ -968,6 +968,8 @@ export default function App() {
         @media (min-width: 900px) {
           .detail-top-grid { display: grid !important; grid-template-columns: 1.3fr 1fr !important; gap: 32px !important; align-items: start !important; }
           .detail-top-grid .detail-gallery { max-width: 100% !important; }
+          /* La galerie reste collée en haut quand on descend (sticky façon Airbnb) */
+          .detail-top-grid .detail-gallery { position: sticky !important; top: 20px !important; align-self: start !important; max-height: none !important; }
         }
 
         /* GRAND ÉCRAN (1440px+) */
