@@ -3121,6 +3121,8 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
 function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [blocked, setBlocked] = useState(Array.isArray(listing.blockedDates) ? [...listing.blockedDates] : []);
+  const [mode, setMode] = useState("range"); // "range" = par période, "single" = jour par jour
+  const [rangeStart, setRangeStart] = useState(null); // début de période en cours de sélection
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const fmt = (d) => d.toISOString().split("T")[0];
 
@@ -3140,19 +3142,42 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
   for (let i = 0; i < startWeekday; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
 
-  const toggleDay = (date) => {
+  // Clic sur un jour : comportement selon le mode
+  const handleDayClick = (date) => {
     const ds = fmt(date);
     if (date < today || bookedSet.has(ds)) return; // pas les dates passées ni réservées
-    setBlocked(prev => prev.includes(ds) ? prev.filter(x => x !== ds) : [...prev, ds]);
+
+    if (mode === "single") {
+      // Mode jour par jour : bloquer/débloquer un seul jour
+      setBlocked(prev => prev.includes(ds) ? prev.filter(x => x !== ds) : [...prev, ds]);
+      return;
+    }
+
+    // Mode période : 1er clic = début, 2e clic = fin (bloque tout l'intervalle)
+    if (!rangeStart) {
+      setRangeStart(date);
+    } else {
+      const start = rangeStart < date ? rangeStart : date;
+      const end = rangeStart < date ? date : rangeStart;
+      const newBlocked = new Set(blocked);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const k = fmt(d);
+        if (d >= today && !bookedSet.has(k)) newBlocked.add(k);
+      }
+      setBlocked([...newBlocked]);
+      setRangeStart(null);
+    }
   };
 
   const cellStyle = (date) => {
     if (!date) return { visibility: "hidden" };
     const ds = fmt(date);
     const isPast = date < today, isBooked = bookedSet.has(ds), isBlocked = blocked.includes(ds);
+    const isRangeStart = rangeStart && fmt(rangeStart) === ds;
     let bg = "#dcfce7", color = "#166534", cursor = "pointer", border = "1px solid #86efac", textDecoration = "none";
     if (isPast) { bg = "#f3f4f6"; color = "#d1d5db"; cursor = "not-allowed"; textDecoration = "line-through"; border = "1px solid transparent"; }
     else if (isBooked) { bg = "#fee2e2"; color = "#991b1b"; cursor = "not-allowed"; border = "1px solid #fca5a5"; }
+    else if (isRangeStart) { bg = "#14b8a6"; color = "white"; border = "1px solid #0d9488"; }
     else if (isBlocked) { bg = "#fed7aa"; color = "#9a3412"; border = "1px solid #fb923c"; }
     return { background: bg, color, cursor, border, textDecoration, borderRadius: 10, padding: 8, fontWeight: 600, fontSize: 13, textAlign: "center" };
   };
@@ -3160,7 +3185,20 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
   return (
     <>
       <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 4 }}>📅 Disponibilités</h2>
-      <p style={{ color: "#6b7280", marginBottom: 12, fontSize: 13 }}>{listing.title} · Cliquez sur les jours pour les bloquer.</p>
+      <p style={{ color: "#6b7280", marginBottom: 12, fontSize: 13 }}>{listing.title}</p>
+
+      {/* Choix du mode */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <button onClick={() => { setMode("range"); setRangeStart(null); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: mode === "range" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: mode === "range" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>📆 Par période</button>
+        <button onClick={() => { setMode("single"); setRangeStart(null); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: mode === "single" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: mode === "single" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>👆 Jour par jour</button>
+      </div>
+
+      {/* Instruction selon le mode */}
+      <p style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: 10, fontSize: 12, color: "#92400e", marginBottom: 14 }}>
+        {mode === "range"
+          ? (rangeStart ? `Cliquez sur le dernier jour pour bloquer toute la période (début : ${fmt(rangeStart)})` : "Cliquez sur le 1er jour, puis le dernier jour pour bloquer toute la période.")
+          : "Cliquez sur chaque jour pour le bloquer ou le débloquer."}
+      </p>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap", fontSize: 11 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#dcfce7", border: "1px solid #86efac", borderRadius: 4 }} /> Disponible</span>
@@ -3180,10 +3218,13 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
         {dayNames.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", fontWeight: 700 }}>{d}</div>)}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 18 }}>
-        {cells.map((date, i) => <div key={i} style={cellStyle(date)} onClick={() => date && toggleDay(date)}>{date ? date.getDate() : ""}</div>)}
+        {cells.map((date, i) => <div key={i} style={cellStyle(date)} onClick={() => date && handleDayClick(date)}>{date ? date.getDate() : ""}</div>)}
       </div>
 
-      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>{blocked.length} jour{blocked.length > 1 ? "s" : ""} bloqué{blocked.length > 1 ? "s" : ""} au total</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <p style={{ fontSize: 12, color: "#6b7280" }}>{blocked.length} jour{blocked.length > 1 ? "s" : ""} bloqué{blocked.length > 1 ? "s" : ""}</p>
+        {blocked.length > 0 && <button onClick={() => { setBlocked([]); setRangeStart(null); }} style={{ background: "none", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🗑 Tout débloquer</button>}
+      </div>
 
       <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15 }} onClick={() => { updateBlockedDates(listing, blocked); setModal(null); }}>💾 Enregistrer les disponibilités</button>
     </>
