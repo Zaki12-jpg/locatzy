@@ -1036,15 +1036,15 @@ export default function App() {
         <button className="nav-btn mobile-only" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 Explorer</button>
       </nav>
 
-      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
+      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
-      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
+      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} setPage={setPage} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} />}
-      {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} onToggleFav={handleToggleFavorite} setModal={setModal} /> }
+      {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} /> }
 
       {/* BOTTOM NAV FIXED - Mobile uniquement */}
       <div className="bottom-nav" style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
@@ -1074,7 +1074,7 @@ function BottomBtn({ icon, label, active, onClick, badge, accent, darkMode }) {
   );
 }
 
-function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggleFav, setModal }) {
+function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggleFav, setModal, openOwner }) {
   // Mes favoris : annonces que j'ai aimées et qui sont approuvées
   const myFavIds = favorites.filter(f => f.userId === user.id).map(f => f.listingId);
   const favListings = listings.filter(l => myFavIds.includes(l.id) && l.status === "approved");
@@ -1093,7 +1093,7 @@ function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggl
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {favListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} />)}
+          {favListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} />)}
         </div>
       )}
     </div>
@@ -1190,7 +1190,7 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
 }
 
 // ─── HOME ────────────────────────────────────────────────────────────
-function Home({ listings, filter, setFilter, country, setCountry, countries, search, setSearch, setModal, openDetail, dateFrom, setDateFrom, dateTo, setDateTo, user, onToggleFav, priceMin, setPriceMin, priceMax, setPriceMax, minRooms, setMinRooms, minGuests, setMinGuests, minRating, setMinRating, wifiOnly, setWifiOnly }) {
+function Home({ listings, filter, setFilter, country, setCountry, countries, search, setSearch, setModal, openDetail, openOwner, dateFrom, setDateFrom, dateTo, setDateTo, user, onToggleFav, priceMin, setPriceMin, priceMax, setPriceMax, minRooms, setMinRooms, minGuests, setMinGuests, minRating, setMinRating, wifiOnly, setWifiOnly }) {
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [selectedDropdownCountry, setSelectedDropdownCountry] = useState("");
   const [lodgingDropdownOpen, setLodgingDropdownOpen] = useState(false);
@@ -1473,7 +1473,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
         )}
         <div className="listings-grid" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {listings.length === 0 ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 60, color: "#9ca3af" }}><div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div><p>{dateFrom && dateTo ? "Aucune annonce disponible à ces dates" : "Aucune annonce trouvée"}</p>{dateFrom && dateTo && <p style={{ fontSize: 12, marginTop: 8 }}>Essayez d'autres dates</p>}</div>
-          : listings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} />)}
+          : listings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} />)}
         </div>
       </div>
     </div>
@@ -1481,7 +1481,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
 }
 
 // ─── OWNER PROFILE PAGE ──────────────────────────────────────────────
-function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage, openDetail, setModal, onToggleFav }) {
+function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage, openDetail, setModal, onToggleFav, openOwner }) {
   const users = DB.get("lcy_users");
   const owner = users.find(u => u.id === ownerId);
   if (!owner) {
@@ -1552,7 +1552,7 @@ function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage,
         <Empty icon="📋" msg="Aucune annonce active" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
-          {ownerListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} />)}
+          {ownerListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} />)}
         </div>
       )}
 
@@ -1584,7 +1584,7 @@ function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage,
   );
 }
 
-function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav }) {
+function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav, openOwner }) {
   const [idx, setIdx] = useState(0);
   const photo = l.photos[idx];
   const isImage = photo && photo.startsWith && photo.startsWith("data:");
@@ -1642,7 +1642,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav 
         <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 12 }}>📍 {l.city} · {isLodging(l.type) ? `🛏 ${l.rooms} ch · 👥 ${l.guests} pers${l.wifi === true ? " · 📶" : l.wifi === false ? " · 🚫📶" : ""}` : `💺 ${l.seats} pl · ${FUEL_LABELS[l.fuel] || "⛽"}`}</p>
         <p style={{ color: "#4b5563", fontSize: 13, lineHeight: 1.5, marginBottom: 14, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{l.desc}</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 14, borderTop: "1px solid #f0f0f0", gap: 8 }} onClick={e => e.stopPropagation()}>
-          <span style={{ fontSize: 12, color: "#6b7280", flex: 1 }}>Par <strong style={{ color: "#0a0a0a" }}>{l.ownerName}</strong></span>
+          <span style={{ fontSize: 12, color: "#6b7280", flex: 1 }}>Par <strong onClick={(e) => { e.stopPropagation(); if (openOwner) openOwner(l.ownerId); }} style={{ color: "#14b8a6", cursor: "pointer", textDecoration: "underline" }}>{l.ownerName}</strong></span>
           <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 12 }} onClick={onContact}>💬</button>
           <button className="btn btn-primary" style={{ padding: "9px 16px", fontSize: 13 }} onClick={onBook}>Réserver</button>
         </div>
