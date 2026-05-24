@@ -1592,8 +1592,28 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav 
   const fav = user && isFavorite(user.id, l.id);
   return (
     <div className="card" onClick={onOpen} style={{ cursor: "pointer" }}>
-      <div style={{ height: 200, position: "relative", background: PROPERTY_TYPES[l.type]?.bgGradient || "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div
+        style={{ height: 200, position: "relative", background: PROPERTY_TYPES[l.type]?.bgGradient || "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}
+        onTouchStart={(e) => { e.currentTarget.dataset.touchx = e.touches[0].clientX; }}
+        onTouchEnd={(e) => {
+          if (l.photos.length <= 1) return;
+          const startX = parseFloat(e.currentTarget.dataset.touchx || "0");
+          const diff = e.changedTouches[0].clientX - startX;
+          if (Math.abs(diff) > 40) {
+            e.stopPropagation();
+            if (diff < 0) setIdx((idx + 1) % l.photos.length); // glisse gauche → suivant
+            else setIdx((idx - 1 + l.photos.length) % l.photos.length); // glisse droite → précédent
+          }
+        }}
+      >
         {isImage ? <img src={photo} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 80 }}>{photo || PROPERTY_TYPES[l.type]?.icon || "🏠"}</span>}
+        {/* Flèches de navigation (si plusieurs photos) */}
+        {l.photos.length > 1 && (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + l.photos.length) % l.photos.length); }} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.9)", borderRadius: "50%", width: 32, height: 32, fontSize: 17, fontWeight: 700, color: "#0a0a0a", boxShadow: "0 2px 6px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} aria-label="Précédent">‹</button>
+            <button onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % l.photos.length); }} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.9)", borderRadius: "50%", width: 32, height: 32, fontSize: 17, fontWeight: 700, color: "#0a0a0a", boxShadow: "0 2px 6px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} aria-label="Suivant">›</button>
+          </>
+        )}
         {l.photos.length > 1 && <div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>{l.photos.map((_, i) => <button key={i} onClick={() => setIdx(i)} style={{ width: 8, height: 8, borderRadius: "50%", border: "none", background: i === idx ? "white" : "rgba(255,255,255,0.5)" }} />)}</div>}
         <span style={{ position: "absolute", top: 12, left: 12, background: "white", borderRadius: 50, padding: "5px 12px", fontSize: 11, fontWeight: 700 }}>{PROPERTY_TYPES[l.type]?.icon} {PROPERTY_TYPES[l.type]?.label}</span>
         <span style={{ position: "absolute", top: 12, right: 50, background: "rgba(0,0,0,0.7)", color: "white", borderRadius: 50, padding: "5px 12px", fontSize: 11, fontWeight: 600 }}>{l.country}</span>
