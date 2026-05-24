@@ -1551,7 +1551,7 @@ function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage,
       {ownerListings.length === 0 ? (
         <Empty icon="📋" msg="Aucune annonce active" />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
+        <div className="listings-grid" style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
           {ownerListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} />)}
         </div>
       )}
