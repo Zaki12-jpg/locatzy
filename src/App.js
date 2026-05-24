@@ -624,10 +624,12 @@ export default function App() {
   };
 
   // 📅 Mettre à jour les dates bloquées (indisponibilités) d'une annonce
-  const updateBlockedDates = async (listing, blockedDates) => {
+  const updateBlockedDates = async (listing, blockedDates, minRules) => {
     if (!listing.fbId) { flash("Erreur annonce", "#ef4444"); return; }
     try {
-      await updateDoc(doc(db, "listings", listing.fbId), { blockedDates });
+      const data = { blockedDates };
+      if (minRules !== undefined) data.minRules = minRules; // règles de minimum par période
+      await updateDoc(doc(db, "listings", listing.fbId), data);
       flash("✓ Disponibilités mises à jour !");
     } catch (err) {
       console.log("Erreur maj disponibilités:", err);
@@ -3123,6 +3125,11 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
   const [blocked, setBlocked] = useState(Array.isArray(listing.blockedDates) ? [...listing.blockedDates] : []);
   const [mode, setMode] = useState("range"); // "range" = par période, "single" = jour par jour
   const [rangeStart, setRangeStart] = useState(null); // début de période en cours de sélection
+  // Règles de minimum par période : [{ from, to, minDays }]
+  const [minRules, setMinRules] = useState(Array.isArray(listing.minRules) ? [...listing.minRules] : []);
+  const [ruleFrom, setRuleFrom] = useState("");
+  const [ruleTo, setRuleTo] = useState("");
+  const [ruleMin, setRuleMin] = useState("");
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const fmt = (d) => d.toISOString().split("T")[0];
 
@@ -3226,7 +3233,49 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
         {blocked.length > 0 && <button onClick={() => { setBlocked([]); setRangeStart(null); }} style={{ background: "none", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🗑 Tout débloquer</button>}
       </div>
 
-      <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15 }} onClick={() => { updateBlockedDates(listing, blocked); setModal(null); }}>💾 Enregistrer les disponibilités</button>
+      {/* ⏱ MINIMUM DE JOURS PAR PÉRIODE */}
+      <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: 16, marginBottom: 18 }}>
+        <h3 style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>⏱ Minimum de jours par période</h3>
+        <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Ex : en haute saison, exiger un minimum de jours. Les autres dates restent à 1 jour minimum.</p>
+
+        {/* Liste des règles existantes */}
+        {minRules.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+            {minRules.map((r, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "white", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", fontSize: 12 }}>
+                <span>📆 Du <strong>{r.from}</strong> au <strong>{r.to}</strong> → min <strong>{r.minDays} jours</strong></span>
+                <button onClick={() => setMinRules(minRules.filter((_, idx) => idx !== i))} style={{ background: "none", color: "#ef4444", fontWeight: 700, cursor: "pointer", fontSize: 16 }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Ajouter une règle */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Du</label>
+            <input type="date" value={ruleFrom} onChange={e => setRuleFrom(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Au</label>
+            <input type="date" value={ruleTo} onChange={e => setRuleTo(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Minimum de jours</label>
+            <input type="number" min="2" placeholder="10" value={ruleMin} onChange={e => setRuleMin(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+          <button onClick={() => {
+            if (!ruleFrom || !ruleTo || !ruleMin || parseInt(ruleMin) < 2) return alert("Remplissez les dates et un minimum d'au moins 2 jours");
+            if (ruleFrom > ruleTo) return alert("La date de début doit être avant la date de fin");
+            setMinRules([...minRules, { from: ruleFrom, to: ruleTo, minDays: parseInt(ruleMin) }]);
+            setRuleFrom(""); setRuleTo(""); setRuleMin("");
+          }} className="btn btn-ghost" style={{ border: "2px solid #14b8a6", color: "#0d9488", fontWeight: 700, padding: "8px 16px", whiteSpace: "nowrap" }}>+ Ajouter</button>
+        </div>
+      </div>
+
+      <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15 }} onClick={() => { updateBlockedDates(listing, blocked, minRules); setModal(null); }}>💾 Enregistrer les disponibilités</button>
     </>
   );
 }
@@ -3297,6 +3346,19 @@ function BookingCalendar({ listing, user, book, setModal }) {
   const priceInfo = days > 0 ? getPriceWithOffer(listing, days) : { pricePerDay: listing.price, total: 0, offerApplied: false };
   const total = priceInfo.total;
 
+  // ⏱ Vérifier le minimum de jours requis selon les règles de période du propriétaire
+  // Une règle s'applique si la réservation TOUCHE la période de la règle
+  let requiredMin = 1;
+  if (from && to && Array.isArray(listing.minRules)) {
+    listing.minRules.forEach(r => {
+      // La réservation touche-t-elle la période de la règle ?
+      if (datesOverlap(fmt(from), fmt(to), r.from, r.to)) {
+        if (r.minDays > requiredMin) requiredMin = r.minDays;
+      }
+    });
+  }
+  const minNotMet = from && to && days < requiredMin;
+
   return (
     <>
       <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 4 }}>{PROPERTY_TYPES[listing.type] && PROPERTY_TYPES[listing.type].icon || "🏠"} {listing.title}</h2>
@@ -3348,7 +3410,12 @@ function BookingCalendar({ listing, user, book, setModal }) {
           <div style={{ borderTop: "1px solid #333", marginTop: 10, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontWeight: 700 }}>Total</span><span className="display" style={{ fontWeight: 800, fontSize: 26, color: "#14b8a6" }}>{total}€</span></div>
         </div>
       )}
-      <button className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: from && to ? 1 : 0.4 }} disabled={!from || !to} onClick={() => from && to && setModal({ type: "bookingInfo", data: { listing, from: fmt(from), to: fmt(to) } })}>Continuer →</button>
+      {minNotMet && (
+        <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 12, textAlign: "center", fontWeight: 600 }}>
+          ⏱ Ces dates nécessitent une réservation de minimum {requiredMin} jours (vous avez sélectionné {days} jour{days > 1 ? "s" : ""}).
+        </div>
+      )}
+      <button className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: (from && to && !minNotMet) ? 1 : 0.4 }} disabled={!from || !to || minNotMet} onClick={() => from && to && !minNotMet && setModal({ type: "bookingInfo", data: { listing, from: fmt(from), to: fmt(to) } })}>Continuer →</button>
       <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 8 }}>📝 Étape suivante : vos informations</p>
     </>
   );
