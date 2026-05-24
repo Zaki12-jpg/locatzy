@@ -3300,6 +3300,7 @@ function BookingCalendar({ listing, user, book, setModal }) {
     if (!date) return { visibility: "hidden" };
     const ds = fmt(date);
     const isPast = date < today, isBooked = bookedSet.has(ds);
+    const isNoReturn = Array.isArray(listing.noReturnDates) && listing.noReturnDates.includes(ds);
     const isStart = from && fmt(date) === fmt(from);
     const isEnd = to && fmt(date) === fmt(to);
     const isBetween = from && to && date > from && date < to;
@@ -3308,6 +3309,7 @@ function BookingCalendar({ listing, user, book, setModal }) {
     else if (isBooked) { bg = "#fee2e2"; color = "#991b1b"; cursor = "not-allowed"; textDecoration = "line-through"; }
     else if (isStart || isEnd) { bg = "#14b8a6"; color = "white"; }
     else if (isBetween) { bg = "#ccfbf1"; color = "#0f766e"; }
+    else if (isNoReturn) { bg = "#ede9fe"; color = "#6d28d9"; border = "1px solid #c4b5fd"; }
     else { bg = "#dcfce7"; color = "#166534"; border = "1px solid #86efac"; }
     return { background: bg, color, cursor, textDecoration, border, borderRadius: 10, padding: 8, fontWeight: (isStart || isEnd) ? 700 : 500, fontSize: 13, textAlign: "center" };
   };
@@ -3330,6 +3332,7 @@ function BookingCalendar({ listing, user, book, setModal }) {
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#dcfce7", border: "1px solid #86efac", borderRadius: 4 }} /> Disponible</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#fee2e2", borderRadius: 4 }} /> Réservé</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#14b8a6", borderRadius: 4 }} /> Sélection</span>
+        {Array.isArray(listing.noReturnDates) && listing.noReturnDates.length > 0 && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#ede9fe", border: "1px solid #c4b5fd", borderRadius: 4 }} /> Retour interdit</span>}
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
