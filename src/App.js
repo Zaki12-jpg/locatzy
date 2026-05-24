@@ -624,11 +624,11 @@ export default function App() {
   };
 
   // 📅 Mettre à jour les dates bloquées (indisponibilités) d'une annonce
-  const updateBlockedDates = async (listing, blockedDates, minRules) => {
+  const updateBlockedDates = async (listing, blockedDates, noReturnDates) => {
     if (!listing.fbId) { flash("Erreur annonce", "#ef4444"); return; }
     try {
       const data = { blockedDates };
-      if (minRules !== undefined) data.minRules = minRules; // règles de minimum par période
+      if (noReturnDates !== undefined) data.noReturnDates = noReturnDates; // jours où le retour est interdit
       await updateDoc(doc(db, "listings", listing.fbId), data);
       flash("✓ Disponibilités mises à jour !");
     } catch (err) {
