@@ -623,6 +623,18 @@ export default function App() {
     }
   };
 
+  // 📅 Mettre à jour les dates bloquées (indisponibilités) d'une annonce
+  const updateBlockedDates = async (listing, blockedDates) => {
+    if (!listing.fbId) { flash("Erreur annonce", "#ef4444"); return; }
+    try {
+      await updateDoc(doc(db, "listings", listing.fbId), { blockedDates });
+      flash("✓ Disponibilités mises à jour !");
+    } catch (err) {
+      console.log("Erreur maj disponibilités:", err);
+      flash("Erreur, réessayez.", "#ef4444");
+    }
+  };
+
   // 💳 Paiement Stripe : mémorise la réservation, appelle le serveur, puis redirige vers Stripe
   const payerAvecStripe = async (listing, from, to, total, info = {}) => {
     try {
@@ -1010,7 +1022,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -2119,6 +2131,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
                   <Status status={l.status} />
                 </div>
                 <button className="btn btn-ghost" style={{ width: "100%", marginTop: 12, border: "2px solid #14b8a6", color: "#0d9488", fontWeight: 700 }} onClick={() => setModal({ type: "edit", data: l })}>✏️ Modifier cette annonce</button>
+                <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8, border: "2px solid #f59e0b", color: "#d97706", fontWeight: 700 }} onClick={() => setModal({ type: "availability", data: l })}>📅 Gérer les disponibilités</button>
               </div>
             );
           })}
@@ -2470,7 +2483,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -2841,6 +2854,8 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
 
         {modal.type === "book" && <BookingCalendar listing={modal.data} user={user} book={book} setModal={setModal} />}
 
+        {modal.type === "availability" && <AvailabilityCalendar listing={modal.data} updateBlockedDates={updateBlockedDates} setModal={setModal} bookings={bookings} />}
+
         {/* 📝 INFORMATIONS DE RÉSERVATION */}
         {modal.type === "bookingInfo" && (() => {
           const { listing, from, to } = modal.data;
@@ -3103,6 +3118,78 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
 }
 
 // ─── BOOKING CALENDAR ───────────────────────────────────────────────
+function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings }) {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [blocked, setBlocked] = useState(Array.isArray(listing.blockedDates) ? [...listing.blockedDates] : []);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const fmt = (d) => d.toISOString().split("T")[0];
+
+  // Dates déjà réservées (non modifiables par le propriétaire)
+  const bookedSet = new Set();
+  bookings.filter(b => b.listingId === listing.id && b.status === "confirmed").forEach(b => {
+    for (let d = new Date(b.from); d <= new Date(b.to); d.setDate(d.getDate() + 1)) bookedSet.add(fmt(d));
+  });
+
+  const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthNames = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  const dayNames = ["L","M","M","J","V","S","D"];
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+
+  const toggleDay = (date) => {
+    const ds = fmt(date);
+    if (date < today || bookedSet.has(ds)) return; // pas les dates passées ni réservées
+    setBlocked(prev => prev.includes(ds) ? prev.filter(x => x !== ds) : [...prev, ds]);
+  };
+
+  const cellStyle = (date) => {
+    if (!date) return { visibility: "hidden" };
+    const ds = fmt(date);
+    const isPast = date < today, isBooked = bookedSet.has(ds), isBlocked = blocked.includes(ds);
+    let bg = "#dcfce7", color = "#166534", cursor = "pointer", border = "1px solid #86efac", textDecoration = "none";
+    if (isPast) { bg = "#f3f4f6"; color = "#d1d5db"; cursor = "not-allowed"; textDecoration = "line-through"; border = "1px solid transparent"; }
+    else if (isBooked) { bg = "#fee2e2"; color = "#991b1b"; cursor = "not-allowed"; border = "1px solid #fca5a5"; }
+    else if (isBlocked) { bg = "#fed7aa"; color = "#9a3412"; border = "1px solid #fb923c"; }
+    return { background: bg, color, cursor, border, textDecoration, borderRadius: 10, padding: 8, fontWeight: 600, fontSize: 13, textAlign: "center" };
+  };
+
+  return (
+    <>
+      <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 4 }}>📅 Disponibilités</h2>
+      <p style={{ color: "#6b7280", marginBottom: 12, fontSize: 13 }}>{listing.title} · Cliquez sur les jours pour les bloquer.</p>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap", fontSize: 11 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#dcfce7", border: "1px solid #86efac", borderRadius: 4 }} /> Disponible</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#fed7aa", border: "1px solid #fb923c", borderRadius: 4 }} /> Bloqué par vous</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4 }} /> Déjà réservé</span>
+      </div>
+
+      {/* Navigation mois */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <button onClick={() => setCurrentMonth(new Date(year, month - 1, 1))} style={{ background: "#f3f4f6", borderRadius: 10, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>‹</button>
+        <strong style={{ fontSize: 15 }}>{monthNames[month]} {year}</strong>
+        <button onClick={() => setCurrentMonth(new Date(year, month + 1, 1))} style={{ background: "#f3f4f6", borderRadius: 10, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>›</button>
+      </div>
+
+      {/* Grille jours */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 8 }}>
+        {dayNames.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", fontWeight: 700 }}>{d}</div>)}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 18 }}>
+        {cells.map((date, i) => <div key={i} style={cellStyle(date)} onClick={() => date && toggleDay(date)}>{date ? date.getDate() : ""}</div>)}
+      </div>
+
+      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>{blocked.length} jour{blocked.length > 1 ? "s" : ""} bloqué{blocked.length > 1 ? "s" : ""} au total</p>
+
+      <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15 }} onClick={() => { updateBlockedDates(listing, blocked); setModal(null); }}>💾 Enregistrer les disponibilités</button>
+    </>
+  );
+}
+
 function BookingCalendar({ listing, user, book, setModal }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [from, setFrom] = useState(null);
@@ -3117,6 +3204,10 @@ function BookingCalendar({ listing, user, book, setModal }) {
       bookedSet.add(d.toISOString().split("T")[0]);
     }
   });
+  // Ajouter les dates bloquées manuellement par le propriétaire
+  if (Array.isArray(listing.blockedDates)) {
+    listing.blockedDates.forEach(ds => bookedSet.add(ds));
+  }
   const fmt = (d) => d.toISOString().split("T")[0];
   const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
   const firstDay = new Date(year, month, 1);
