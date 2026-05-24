@@ -3125,11 +3125,8 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
   const [blocked, setBlocked] = useState(Array.isArray(listing.blockedDates) ? [...listing.blockedDates] : []);
   const [mode, setMode] = useState("range"); // "range" = par période, "single" = jour par jour
   const [rangeStart, setRangeStart] = useState(null); // début de période en cours de sélection
-  // Règles de minimum par période : [{ from, to, minDays }]
-  const [minRules, setMinRules] = useState(Array.isArray(listing.minRules) ? [...listing.minRules] : []);
-  const [ruleFrom, setRuleFrom] = useState("");
-  const [ruleTo, setRuleTo] = useState("");
-  const [ruleMin, setRuleMin] = useState("");
+  // Jours où le retour (fin de location) est interdit
+  const [noReturn, setNoReturn] = useState(Array.isArray(listing.noReturnDates) ? [...listing.noReturnDates] : []);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const fmt = (d) => d.toISOString().split("T")[0];
 
@@ -3153,6 +3150,12 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
   const handleDayClick = (date) => {
     const ds = fmt(date);
     if (date < today || bookedSet.has(ds)) return; // pas les dates passées ni réservées
+
+    if (mode === "noreturn") {
+      // Mode retour interdit : marquer/démarquer un jour où le retour est interdit
+      setNoReturn(prev => prev.includes(ds) ? prev.filter(x => x !== ds) : [...prev, ds]);
+      return;
+    }
 
     if (mode === "single") {
       // Mode jour par jour : bloquer/débloquer un seul jour
@@ -3179,13 +3182,14 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
   const cellStyle = (date) => {
     if (!date) return { visibility: "hidden" };
     const ds = fmt(date);
-    const isPast = date < today, isBooked = bookedSet.has(ds), isBlocked = blocked.includes(ds);
+    const isPast = date < today, isBooked = bookedSet.has(ds), isBlocked = blocked.includes(ds), isNoReturn = noReturn.includes(ds);
     const isRangeStart = rangeStart && fmt(rangeStart) === ds;
     let bg = "#dcfce7", color = "#166534", cursor = "pointer", border = "1px solid #86efac", textDecoration = "none";
     if (isPast) { bg = "#f3f4f6"; color = "#d1d5db"; cursor = "not-allowed"; textDecoration = "line-through"; border = "1px solid transparent"; }
     else if (isBooked) { bg = "#fee2e2"; color = "#991b1b"; cursor = "not-allowed"; border = "1px solid #fca5a5"; }
     else if (isRangeStart) { bg = "#14b8a6"; color = "white"; border = "1px solid #0d9488"; }
     else if (isBlocked) { bg = "#fed7aa"; color = "#9a3412"; border = "1px solid #fb923c"; }
+    else if (isNoReturn) { bg = "#ede9fe"; color = "#6d28d9"; border = "1px solid #c4b5fd"; }
     return { background: bg, color, cursor, border, textDecoration, borderRadius: 10, padding: 8, fontWeight: 600, fontSize: 13, textAlign: "center" };
   };
 
@@ -3195,22 +3199,26 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
       <p style={{ color: "#6b7280", marginBottom: 12, fontSize: 13 }}>{listing.title}</p>
 
       {/* Choix du mode */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <button onClick={() => { setMode("range"); setRangeStart(null); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: mode === "range" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: mode === "range" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>📆 Par période</button>
-        <button onClick={() => { setMode("single"); setRangeStart(null); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: mode === "single" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: mode === "single" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>👆 Jour par jour</button>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        <button onClick={() => { setMode("range"); setRangeStart(null); }} style={{ flex: "1 1 30%", padding: 9, borderRadius: 10, border: mode === "range" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: mode === "range" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>📆 Période</button>
+        <button onClick={() => { setMode("single"); setRangeStart(null); }} style={{ flex: "1 1 30%", padding: 9, borderRadius: 10, border: mode === "single" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: mode === "single" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>👆 Jour</button>
+        <button onClick={() => { setMode("noreturn"); setRangeStart(null); }} style={{ flex: "1 1 30%", padding: 9, borderRadius: 10, border: mode === "noreturn" ? "2px solid #7c3aed" : "2px solid #e5e7eb", background: mode === "noreturn" ? "#ede9fe" : "white", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>🚫 Retour interdit</button>
       </div>
 
       {/* Instruction selon le mode */}
-      <p style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: 10, fontSize: 12, color: "#92400e", marginBottom: 14 }}>
-        {mode === "range"
+      <p style={{ background: mode === "noreturn" ? "#ede9fe" : "#fffbeb", border: mode === "noreturn" ? "1px solid #c4b5fd" : "1px solid #fde68a", borderRadius: 10, padding: 10, fontSize: 12, color: mode === "noreturn" ? "#6d28d9" : "#92400e", marginBottom: 14 }}>
+        {mode === "noreturn"
+          ? "Cliquez sur les jours où le client ne peut PAS rendre le bien (fin de location interdite). Il devra prolonger jusqu'à un jour autorisé."
+          : mode === "range"
           ? (rangeStart ? `Cliquez sur le dernier jour pour bloquer toute la période (début : ${fmt(rangeStart)})` : "Cliquez sur le 1er jour, puis le dernier jour pour bloquer toute la période.")
           : "Cliquez sur chaque jour pour le bloquer ou le débloquer."}
       </p>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap", fontSize: 11 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#dcfce7", border: "1px solid #86efac", borderRadius: 4 }} /> Disponible</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#fed7aa", border: "1px solid #fb923c", borderRadius: 4 }} /> Bloqué par vous</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4 }} /> Déjà réservé</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#fed7aa", border: "1px solid #fb923c", borderRadius: 4 }} /> Bloqué</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#ede9fe", border: "1px solid #c4b5fd", borderRadius: 4 }} /> Retour interdit</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 14, height: 14, background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 4 }} /> Réservé</span>
       </div>
 
       {/* Navigation mois */}
@@ -3233,49 +3241,11 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
         {blocked.length > 0 && <button onClick={() => { setBlocked([]); setRangeStart(null); }} style={{ background: "none", color: "#ef4444", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🗑 Tout débloquer</button>}
       </div>
 
-      {/* ⏱ MINIMUM DE JOURS PAR PÉRIODE */}
-      <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 14, padding: 16, marginBottom: 18 }}>
-        <h3 style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>⏱ Minimum de jours par période</h3>
-        <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Ex : en haute saison, exiger un minimum de jours. Les autres dates restent à 1 jour minimum.</p>
+      {noReturn.length > 0 && (
+        <p style={{ fontSize: 12, color: "#7c3aed", marginBottom: 14, fontWeight: 600 }}>🚫 {noReturn.length} jour{noReturn.length > 1 ? "s" : ""} où le retour est interdit</p>
+      )}
 
-        {/* Liste des règles existantes */}
-        {minRules.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-            {minRules.map((r, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "white", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", fontSize: 12 }}>
-                <span>📆 Du <strong>{r.from}</strong> au <strong>{r.to}</strong> → min <strong>{r.minDays} jours</strong></span>
-                <button onClick={() => setMinRules(minRules.filter((_, idx) => idx !== i))} style={{ background: "none", color: "#ef4444", fontWeight: 700, cursor: "pointer", fontSize: 16 }}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Ajouter une règle */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Du</label>
-            <input type="date" value={ruleFrom} onChange={e => setRuleFrom(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, boxSizing: "border-box" }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Au</label>
-            <input type="date" value={ruleTo} onChange={e => setRuleTo(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, boxSizing: "border-box" }} />
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Minimum de jours</label>
-            <input type="number" min="2" placeholder="10" value={ruleMin} onChange={e => setRuleMin(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, boxSizing: "border-box" }} />
-          </div>
-          <button onClick={() => {
-            if (!ruleFrom || !ruleTo || !ruleMin || parseInt(ruleMin) < 2) return alert("Remplissez les dates et un minimum d'au moins 2 jours");
-            if (ruleFrom > ruleTo) return alert("La date de début doit être avant la date de fin");
-            setMinRules([...minRules, { from: ruleFrom, to: ruleTo, minDays: parseInt(ruleMin) }]);
-            setRuleFrom(""); setRuleTo(""); setRuleMin("");
-          }} className="btn btn-ghost" style={{ border: "2px solid #14b8a6", color: "#0d9488", fontWeight: 700, padding: "8px 16px", whiteSpace: "nowrap" }}>+ Ajouter</button>
-        </div>
-      </div>
-
-      <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15 }} onClick={() => { updateBlockedDates(listing, blocked, minRules); setModal(null); }}>💾 Enregistrer les disponibilités</button>
+      <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15 }} onClick={() => { updateBlockedDates(listing, blocked, noReturn); setModal(null); }}>💾 Enregistrer les disponibilités</button>
     </>
   );
 }
@@ -3346,18 +3316,9 @@ function BookingCalendar({ listing, user, book, setModal }) {
   const priceInfo = days > 0 ? getPriceWithOffer(listing, days) : { pricePerDay: listing.price, total: 0, offerApplied: false };
   const total = priceInfo.total;
 
-  // ⏱ Vérifier le minimum de jours requis selon les règles de période du propriétaire
-  // Une règle s'applique si la réservation TOUCHE la période de la règle
-  let requiredMin = 1;
-  if (from && to && Array.isArray(listing.minRules)) {
-    listing.minRules.forEach(r => {
-      // La réservation touche-t-elle la période de la règle ?
-      if (datesOverlap(fmt(from), fmt(to), r.from, r.to)) {
-        if (r.minDays > requiredMin) requiredMin = r.minDays;
-      }
-    });
-  }
-  const minNotMet = from && to && days < requiredMin;
+  // 🚫 Vérifier que la date de fin (retour) ne tombe pas sur un jour "retour interdit"
+  const noReturnSet = Array.isArray(listing.noReturnDates) ? listing.noReturnDates : [];
+  const returnForbidden = from && to && noReturnSet.includes(fmt(to));
 
   return (
     <>
@@ -3410,12 +3371,12 @@ function BookingCalendar({ listing, user, book, setModal }) {
           <div style={{ borderTop: "1px solid #333", marginTop: 10, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontWeight: 700 }}>Total</span><span className="display" style={{ fontWeight: 800, fontSize: 26, color: "#14b8a6" }}>{total}€</span></div>
         </div>
       )}
-      {minNotMet && (
-        <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 12, textAlign: "center", fontWeight: 600 }}>
-          ⏱ Ces dates nécessitent une réservation de minimum {requiredMin} jours (vous avez sélectionné {days} jour{days > 1 ? "s" : ""}).
+      {returnForbidden && (
+        <div style={{ background: "#ede9fe", border: "1px solid #c4b5fd", color: "#6d28d9", padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 12, textAlign: "center", fontWeight: 600 }}>
+          🚫 Le retour n'est pas possible le {fmt(to)}. Choisissez une autre date de fin.
         </div>
       )}
-      <button className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: (from && to && !minNotMet) ? 1 : 0.4 }} disabled={!from || !to || minNotMet} onClick={() => from && to && !minNotMet && setModal({ type: "bookingInfo", data: { listing, from: fmt(from), to: fmt(to) } })}>Continuer →</button>
+      <button className="btn btn-primary" style={{ width: "100%", padding: "14px", opacity: (from && to && !returnForbidden) ? 1 : 0.4 }} disabled={!from || !to || returnForbidden} onClick={() => from && to && !returnForbidden && setModal({ type: "bookingInfo", data: { listing, from: fmt(from), to: fmt(to) } })}>Continuer →</button>
       <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 8 }}>📝 Étape suivante : vos informations</p>
     </>
   );
