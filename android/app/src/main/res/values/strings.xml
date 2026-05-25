@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">locatzy</string>
+    <string name="title_activity_main">locatzy</string>
+    <string name="package_name">com.locatzy.app</string>
+    <string name="custom_url_scheme">com.locatzy.app</string>
+</resources>

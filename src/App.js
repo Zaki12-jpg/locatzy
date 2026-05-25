@@ -322,6 +322,15 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [modal, setModal] = useState(null);
 
+  // 🔝 Remonter la page tout en haut à chaque changement de page ou d'annonce
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    // Sécurité mobile : certains conteneurs ont leur propre scroll
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+  }, [page, selectedListing, selectedOwner]);
+
   useEffect(() => {
     DB.init();
     reload();
@@ -728,6 +737,33 @@ export default function App() {
     setModal(null);
   };
 
+  // ✏️ Modifier son propre avis
+  const updateReview = async (review, rating, comment) => {
+    if (!review.fbId) { flash("Erreur avis", "#ef4444"); return; }
+    if (review.userId !== user.id) { flash("Vous ne pouvez modifier que vos avis", "#ef4444"); return; }
+    try {
+      await updateDoc(doc(db, "reviews", review.fbId), { rating, comment, edited: true });
+      flash("✓ Avis modifié !");
+      setModal(null);
+    } catch (e) {
+      console.log("Erreur modif avis:", e);
+      flash("Erreur, réessayez", "#ef4444");
+    }
+  };
+
+  // 🗑 Supprimer son propre avis
+  const deleteReview = async (review) => {
+    if (!review.fbId) { flash("Erreur avis", "#ef4444"); return; }
+    if (review.userId !== user.id) { flash("Vous ne pouvez supprimer que vos avis", "#ef4444"); return; }
+    try {
+      await deleteDoc(doc(db, "reviews", review.fbId));
+      flash("Avis supprimé", "#ef4444");
+    } catch (e) {
+      console.log("Erreur suppr avis:", e);
+      flash("Erreur, réessayez", "#ef4444");
+    }
+  };
+
   // 💬 Envoyer un message
   const sendMessage = async (listingId, toUserId, toUserName, text) => {
     if (!text.trim()) return;
@@ -1024,7 +1060,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -1051,7 +1087,7 @@ export default function App() {
       </nav>
 
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
-      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
+      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} setPage={setPage} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
@@ -1666,7 +1702,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
 }
 
 // ─── DETAIL PAGE ─────────────────────────────────────────────────────
-function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner }) {
+function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
@@ -2034,7 +2070,13 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
                       </div>
                     </div>
                     <Stars value={r.rating} size={13} />
-                    <p style={{ marginTop: 8, fontSize: 13, color: "#374151", lineHeight: 1.5 }}>"{r.comment}"</p>
+                    <p style={{ marginTop: 8, fontSize: 13, color: "#374151", lineHeight: 1.5 }}>"{r.comment}"{r.edited && <span style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}> (modifié)</span>}</p>
+                    {user && r.userId === user.id && (
+                      <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
+                        <button onClick={() => setModal({ type: "editReview", data: r })} style={{ background: "none", color: "#0d9488", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✏️ Modifier</button>
+                        <button onClick={() => { if (window.confirm("Supprimer cet avis ?")) deleteReview(r); }} style={{ background: "none", color: "#ef4444", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🗑 Supprimer</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2485,7 +2527,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, markMessagesRead, bookings, flash }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -2506,6 +2548,10 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
       setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "" });
       // Pré-charger les photos existantes (sauf si c'est juste un emoji par défaut)
       setPhotos(Array.isArray(l.photos) && l.photos.length > 0 && l.photos[0].startsWith("data:") ? l.photos : []);
+    }
+    // ✏️ Pré-remplir avec l'avis à modifier
+    if (modal?.type === "editReview" && modal.data) {
+      setForm({ rating: modal.data.rating, comment: modal.data.comment });
     }
   }, [modal?.type, user]);
 
@@ -3047,6 +3093,32 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
           </>
         )}
 
+        {/* ✏️ MODIFIER UN AVIS */}
+        {modal.type === "editReview" && (
+          <>
+            <h2 className="display" style={{ fontWeight: 800, fontSize: 24, marginBottom: 20 }}>✏️ Modifier mon avis</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 8 }}>Votre note *</label>
+                <div style={{ background: "#f9fafb", borderRadius: 12, padding: 20, textAlign: "center" }}>
+                  <Stars value={form.rating || 0} size={42} onChange={(n) => set("rating", n)} />
+                  <p style={{ fontSize: 13, color: "#6b7280", marginTop: 8 }}>{form.rating ? `${form.rating}/5 — ${["", "Mauvais", "Moyen", "Bien", "Très bien", "Excellent"][form.rating]}` : "Cliquez pour noter"}</p>
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Votre commentaire *</label>
+                <textarea className="input" rows={4} placeholder="Partagez votre expérience..." value={form.comment || ""} onChange={e => set("comment", e.target.value)} style={{ resize: "vertical" }} />
+              </div>
+              {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
+              <button className="btn btn-primary" onClick={() => {
+                if (!form.rating) return setFormError("Donnez une note");
+                if (!form.comment || !form.comment.trim()) return setFormError("Écrivez un commentaire");
+                updateReview(modal.data, form.rating, form.comment.trim());
+              }}>✓ Enregistrer les modifications</button>
+            </div>
+          </>
+        )}
+
         {/* 💬 CONTACTER LE PROPRIÉTAIRE */}
         {modal.type === "contactOwner" && !user && (
           <>
@@ -3258,6 +3330,8 @@ function BookingCalendar({ listing, user, book, setModal }) {
 
   const bookedDates = getBookedDates(listing.id);
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  // 📅 Date maximum : 1 an à partir d'aujourd'hui (pas de réservation au-delà)
+  const maxDate = new Date(today); maxDate.setFullYear(maxDate.getFullYear() + 1);
   const bookedSet = new Set();
   bookedDates.forEach(b => {
     for (let d = new Date(b.from); d <= new Date(b.to); d.setDate(d.getDate() + 1)) {
@@ -3282,7 +3356,7 @@ function BookingCalendar({ listing, user, book, setModal }) {
   const handleClick = (date) => {
     setError("");
     const ds = fmt(date);
-    if (date < today || bookedSet.has(ds)) return;
+    if (date < today || date > maxDate || bookedSet.has(ds)) return;
     if (!from || (from && to)) { setFrom(date); setTo(null); }
     else if (date < from) { setFrom(date); setTo(null); }
     else if (date.getTime() === from.getTime()) { setFrom(null); setTo(null); }
@@ -3299,7 +3373,7 @@ function BookingCalendar({ listing, user, book, setModal }) {
   const cellStyle = (date) => {
     if (!date) return { visibility: "hidden" };
     const ds = fmt(date);
-    const isPast = date < today, isBooked = bookedSet.has(ds);
+    const isPast = date < today || date > maxDate, isBooked = bookedSet.has(ds);
     const isNoReturn = Array.isArray(listing.noReturnDates) && listing.noReturnDates.includes(ds);
     const isStart = from && fmt(date) === fmt(from);
     const isEnd = to && fmt(date) === fmt(to);
