@@ -226,7 +226,7 @@ function getConversationId(listingId, userA, userB) {
 // - Paiement carte CONFIRMÉ (renterConfirmed) → ajoute ses gains (montant - commission) au solde
 //   ↳ Quand admin marque le payout "paid" → le solde redescend (l'argent est versé)
 // - Paiement sur place CONFIRMÉ (renterConfirmed) → soustrait la commission au solde (il doit cette commission)
-function calculateOwnerBalance(ownerId, bookings, payouts) {
+function calculateOwnerBalance(ownerId, bookings, payouts, debtPayments) {
   let balance = 0;
   const ownerBookings = (bookings || []).filter(b => b.ownerId === ownerId && b.renterConfirmed);
   ownerBookings.forEach(b => {
@@ -248,6 +248,12 @@ function calculateOwnerBalance(ownerId, bookings, payouts) {
   (payouts || []).forEach(p => {
     if (p.ownerId === ownerId && p.type === "withdrawal") {
       balance -= (p.amount || 0);
+    }
+  });
+  // 💳 AJOUTER les paiements de dettes CONFIRMÉS (proprio a réglé son solde négatif)
+  (debtPayments || []).forEach(d => {
+    if (d.ownerId === ownerId && d.status === "confirmed") {
+      balance += (d.amount || 0); // remonte le solde
     }
   });
   return Math.round(balance * 100) / 100; // arrondi 2 décimales
@@ -354,6 +360,7 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [payouts, setPayouts] = useState([]);
+  const [debtPayments, setDebtPayments] = useState([]);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("lcy_dark") === "true");
   
   const toggleDarkMode = () => {
@@ -479,7 +486,14 @@ export default function App() {
     }, (err) => {
       console.log("Firebase payouts error:", err);
     });
-    return () => { unsub(); unsubLodgingTypes(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); unsubPayouts(); };
+    // 🔥 FIREBASE : écouter les paiements de dettes (proprios qui règlent leur solde négatif)
+    const unsubDebtPayments = onSnapshot(collection(db, "debtPayments"), (snapshot) => {
+      const fbDebtPayments = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setDebtPayments(fbDebtPayments);
+    }, (err) => {
+      console.log("Firebase debtPayments error:", err);
+    });
+    return () => { unsub(); unsubLodgingTypes(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); unsubPayouts(); unsubDebtPayments(); };
   }, []);
 
   // 🏷️ Remplir le cache global des types de logement custom (pour isLodging, icônes, labels)
@@ -507,7 +521,7 @@ export default function App() {
     if (!user || user.role !== "admin") return; // Seul l'admin déclenche la mise à jour (1 source de vérité)
     if (!users || users.length === 0 || !bookings) return;
     users.forEach(async (u) => {
-      const balance = calculateOwnerBalance(u.id, bookings, payouts);
+      const balance = calculateOwnerBalance(u.id, bookings, payouts, debtPayments);
       const alreadyMarked = !!u.balanceWentNegativeAt;
       try {
         if (balance < 0 && !alreadyMarked) {
@@ -519,7 +533,7 @@ export default function App() {
         }
       } catch (e) { console.log("Erreur surveillance solde:", e); }
     });
-  }, [users, bookings, payouts, user]);
+  }, [users, bookings, payouts, debtPayments, user]);
 
   // ⏰ VÉRIFIER LE DÉLAI DE 7 JOURS : désactive automatiquement les comptes en retard
   // Tourne à l'ouverture de l'app et toutes les heures.
@@ -574,11 +588,39 @@ export default function App() {
 
     if (paiement === "annule") {
       localStorage.removeItem("lcy_pending_payment");
+      localStorage.removeItem("lcy_pending_debt_payment");
       flash("Paiement annulé", "#ef4444");
       window.history.replaceState({}, "", cleanUrl);
       return;
     }
 
+    // 💳 Retour d'un paiement de DETTE Stripe (proprio qui règle son solde négatif)
+    if (paiement === "reussi") {
+      const debtRaw = localStorage.getItem("lcy_pending_debt_payment");
+      if (debtRaw && user) {
+        try {
+          const pending = JSON.parse(debtRaw);
+          localStorage.removeItem("lcy_pending_debt_payment");
+          // Créer un debtPayment déjà confirmé (paiement carte = automatique)
+          addDoc(collection(db, "debtPayments"), {
+            id: Date.now(),
+            ownerId: pending.userId,
+            ownerName: user.name,
+            ownerEmail: user.email,
+            amount: pending.amount,
+            method: "card",
+            status: "confirmed", // carte = confirmé automatiquement
+            declaredAt: new Date().toISOString(),
+            confirmedAt: new Date().toISOString(),
+          });
+          flash(`✅ Paiement de ${pending.amount}€ confirmé ! Votre solde est mis à jour.`);
+          addNotif(user.id, `✅ Votre paiement de ${pending.amount}€ a été reçu. Votre solde est mis à jour.`, "debt_confirmed");
+          addNotif(getAdminId(), `💳 ${user.name} a réglé ${pending.amount}€ par carte (Stripe)`, "debt_card_paid");
+          window.history.replaceState({}, "", cleanUrl);
+          return;
+        } catch (e) { console.log("Erreur paiement dette retour:", e); }
+      }
+    }
     if (paiement === "reussi") {
       const raw = localStorage.getItem("lcy_pending_payment");
       if (!raw) { window.history.replaceState({}, "", cleanUrl); return; }
@@ -841,6 +883,81 @@ export default function App() {
     } catch (e) {
       console.log("Erreur paiement Stripe:", e);
       flash("Erreur de paiement, réessayez", "#ef4444");
+    }
+  };
+
+  // 💳 RÉGLER UNE DETTE PAR CARTE BANCAIRE (Stripe)
+  const payerDetteAvecStripe = async (amount) => {
+    try {
+      // Mémoriser pour confirmation au retour
+      localStorage.setItem("lcy_pending_debt_payment", JSON.stringify({
+        userId: user.id,
+        amount: amount,
+        timestamp: Date.now(),
+      }));
+      const res = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listingTitle: `Règlement commissions Locatzy — ${user.name}`,
+          amount: amount,
+          from: "—",
+          to: "—",
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        flash("Erreur de paiement, réessayez", "#ef4444");
+      }
+    } catch (e) {
+      console.log("Erreur paiement dette Stripe:", e);
+      flash("Erreur de paiement, réessayez", "#ef4444");
+    }
+  };
+
+  // 💵 DÉCLARER UN PAIEMENT MANUEL (virement, cash, wafacash)
+  const declareDebtPayment = async (amount, method) => {
+    try {
+      await addDoc(collection(db, "debtPayments"), {
+        id: Date.now(),
+        ownerId: user.id,
+        ownerName: user.name,
+        ownerEmail: user.email,
+        amount: Math.round(amount * 100) / 100,
+        method: method, // "transfer" | "wafacash" | "card"
+        status: "pending", // pending → confirmed (par admin)
+        declaredAt: new Date().toISOString(),
+      });
+      addNotif(getAdminId(), `💳 ${user.name} déclare un paiement de ${amount}€ via ${method === "transfer" ? "virement" : method === "wafacash" ? "Wafacash" : "carte"} — à valider`, "debt_payment");
+      sendEmail("blackberrywalid72@gmail.com", `Paiement déclaré ${amount}€`, `${user.name} (${user.email}) déclare avoir réglé ${amount}€ via ${method === "transfer" ? "virement bancaire" : method === "wafacash" ? "Wafacash" : "carte"}. Vérifiez la réception et validez dans l'admin.`);
+      flash("✅ Paiement déclaré, en attente de validation par l'admin");
+      return { ok: true };
+    } catch (e) {
+      console.log("Erreur déclaration paiement:", e);
+      flash("Erreur, réessayez", "#ef4444");
+      return { ok: false };
+    }
+  };
+
+  // ✅ VALIDER UN PAIEMENT DE DETTE (côté admin)
+  const confirmDebtPayment = async (debtPayment) => {
+    try {
+      // 1) Marquer le paiement comme confirmé
+      if (debtPayment.fbId) {
+        await updateDoc(doc(db, "debtPayments", debtPayment.fbId), {
+          status: "confirmed",
+          confirmedAt: new Date().toISOString(),
+        });
+      }
+      // 2) Notifier le proprio + email
+      addNotif(debtPayment.ownerId, `✅ Votre paiement de ${debtPayment.amount}€ a été confirmé. Votre solde a été mis à jour.`, "debt_confirmed");
+      sendEmail(debtPayment.ownerEmail, `Locatzy — Paiement confirmé`, `Bonjour ${debtPayment.ownerName},\n\n✅ Votre paiement de ${debtPayment.amount}€ a été reçu et confirmé.\n\nVotre solde Locatzy a été mis à jour, et votre compte est de nouveau actif (si désactivé).\n\nL'équipe Locatzy`);
+      flash("✅ Paiement confirmé !");
+    } catch (e) {
+      console.log("Erreur confirmDebtPayment:", e);
+      flash("Erreur, réessayez", "#ef4444");
     }
   };
 
@@ -1157,7 +1274,7 @@ export default function App() {
       return { ok: false };
     }
     // 2) Calculer le solde disponible
-    const balance = calculateOwnerBalance(user.id, bookings, payouts);
+    const balance = calculateOwnerBalance(user.id, bookings, payouts, debtPayments);
     if (balance <= 0) {
       flash("Votre solde est nul ou négatif, rien à retirer", "#ef4444");
       return { ok: false };
@@ -1359,7 +1476,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -1388,10 +1505,10 @@ export default function App() {
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
-      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} setPage={setPage} />}
+      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
-      {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} />}
+      {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} />}
       {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} /> }
 
@@ -2445,7 +2562,7 @@ function Stars({ value, size = 16, onChange = null }) {
 }
 
 // ─── MY PAGE ─────────────────────────────────────────────────────────
-function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings, setModal, reviews, user, confirmExchange, requestPayout, payouts, setPage }) {
+function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings, setModal, reviews, user, confirmExchange, requestPayout, payouts, debtPayments, setPage }) {
   const [tab, setTab] = useState("listings");
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
 
@@ -2476,7 +2593,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
 
         {/* 💼 Mon solde (argent disponible MAINTENANT) */}
         {(() => {
-          const balance = calculateOwnerBalance(user.id, bookings, payouts);
+          const balance = calculateOwnerBalance(user.id, bookings, payouts, debtPayments);
           const isPositive = balance >= 0;
           const isDeactivated = user.accountStatus === "deactivated";
           let daysLeft = null;
@@ -2490,15 +2607,23 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
               ? "linear-gradient(135deg,#0d9488,#0f766e)"
               : "linear-gradient(135deg,#dc2626,#991b1b)";
           return (
-            <div onClick={() => setModal({ type: "balanceDetail" })} className="card" style={{ padding: 22, background: bg, color: "white", border: "none", cursor: "pointer" }}>
-              <div style={{ fontSize: 13, opacity: 0.9 }}>{isDeactivated ? "🚫 Compte désactivé" : "💼 Mon solde"}</div>
-              <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{isPositive ? "+" : ""}{balance}€</div>
-              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>Disponible au retrait</div>
-              {isDeactivated && (
-                <div style={{ marginTop: 6, fontSize: 11, opacity: 0.95 }}>⛔ Annonces non visibles</div>
-              )}
-              {!isPositive && !isDeactivated && daysLeft !== null && (
-                <div style={{ marginTop: 6, fontSize: 11, opacity: 0.95 }}>⏰ Reste {daysLeft}j pour régler</div>
+            <div className="card" style={{ padding: 22, background: bg, color: "white", border: "none" }}>
+              <div onClick={() => setModal({ type: "balanceDetail" })} style={{ cursor: "pointer" }}>
+                <div style={{ fontSize: 13, opacity: 0.9 }}>{isDeactivated ? "🚫 Compte désactivé" : "💼 Mon solde"}</div>
+                <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{isPositive ? "+" : ""}{balance}€</div>
+                <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>Disponible au retrait</div>
+                {isDeactivated && (
+                  <div style={{ marginTop: 6, fontSize: 11, opacity: 0.95 }}>⛔ Annonces non visibles</div>
+                )}
+                {!isPositive && !isDeactivated && daysLeft !== null && (
+                  <div style={{ marginTop: 6, fontSize: 11, opacity: 0.95 }}>⏰ Reste {daysLeft}j pour régler</div>
+                )}
+              </div>
+              {/* 💳 Bouton "Régler ma dette" si solde négatif */}
+              {!isPositive && (
+                <button onClick={(e) => { e.stopPropagation(); setModal({ type: "payDebt", data: { amount: Math.abs(balance) } }); }} style={{ marginTop: 12, width: "100%", padding: 10, borderRadius: 10, background: "white", color: isDeactivated ? "#991b1b" : "#dc2626", fontWeight: 800, fontSize: 13, cursor: "pointer", border: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+                  💳 Régler ma dette ({Math.abs(balance)}€)
+                </button>
               )}
             </div>
           );
@@ -2752,7 +2877,7 @@ function NotifPage({ notifications, goToNotif }) {
 }
 
 // ─── ADMIN ───────────────────────────────────────────────────────────
-function Admin({ listings, bookings, users, approveListing, rejectListing, deleteListing, deleteUser, reviews, payouts, markPayoutPaid }) {
+function Admin({ listings, bookings, users, approveListing, rejectListing, deleteListing, deleteUser, reviews, payouts, markPayoutPaid, debtPayments, confirmDebtPayment }) {
   const [tab, setTab] = useState("dashboard");
   const pending = listings.filter(l => l.status === "pending");
   const totalRevenue = bookings.reduce((s, b) => s + b.subtotal, 0);
@@ -2781,7 +2906,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        {[["dashboard","📊 Vue d'ensemble"],["pending",`⏳ À modérer (${pending.length})`],["bookings","💰 Réservations"],["payouts",`💸 Versements (${payouts.filter(p => p.status === "pending").length})`],["listings","📋 Annonces"],["users","👥 Users"],["reviews",`⭐ Avis (${reviews.length})`]].map(([v,l]) => <button key={v} className={`pill ${tab === v ? "active" : ""}`} onClick={() => setTab(v)}>{l}</button>)}
+        {[["dashboard","📊 Vue d'ensemble"],["pending",`⏳ À modérer (${pending.length})`],["bookings","💰 Réservations"],["payouts",`💸 Versements (${payouts.filter(p => p.status === "pending").length})`],["debts",`💳 Paiements dettes (${(debtPayments || []).filter(d => d.status === "pending").length})`],["listings","📋 Annonces"],["users","👥 Users"],["reviews",`⭐ Avis (${reviews.length})`]].map(([v,l]) => <button key={v} className={`pill ${tab === v ? "active" : ""}`} onClick={() => setTab(v)}>{l}</button>)}
       </div>
 
       {tab === "dashboard" && (
@@ -2886,6 +3011,44 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === "debts" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 4 }}>Paiements de commissions déclarés par les propriétaires. Validez après réception de l'argent.</p>
+          {(debtPayments || []).length === 0 ? (
+            <Empty icon="💳" msg="Aucun paiement de dette en attente" />
+          ) : [...debtPayments].sort((a, b) => new Date(b.declaredAt || 0) - new Date(a.declaredAt || 0)).map(d => {
+            const isPending = d.status === "pending";
+            const methodLabel = d.method === "card" ? "💳 Carte (Stripe)" : d.method === "transfer" ? "🏦 Virement bancaire" : "💵 Cash / Wafacash";
+            const methodColor = d.method === "card" ? "#3b82f6" : d.method === "transfer" ? "#0d9488" : "#f59e0b";
+            return (
+              <div key={d.id} className="card" style={{ padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div>
+                    <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{d.ownerName}</h3>
+                    <p style={{ fontSize: 12, color: "#6b7280" }}>📧 {d.ownerEmail}</p>
+                    <p style={{ fontSize: 12, color: methodColor, fontWeight: 700, marginTop: 4 }}>{methodLabel}</p>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="display" style={{ fontWeight: 800, fontSize: 22, color: methodColor }}>{d.amount}€</div>
+                    <span className="badge" style={{ background: isPending ? "#fef3c7" : "#d1fae5", color: isPending ? "#92400e" : "#065f46" }}>{isPending ? "⏳ À VALIDER" : "✓ CONFIRMÉ"}</span>
+                  </div>
+                </div>
+                <div style={{ background: "#f9fafb", borderRadius: 10, padding: 10, fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+                  📅 Déclaré le {d.declaredAt ? new Date(d.declaredAt).toLocaleString("fr-FR") : "—"}
+                  {d.confirmedAt && <p>✅ Confirmé le {new Date(d.confirmedAt).toLocaleString("fr-FR")}</p>}
+                </div>
+                {isPending && d.method !== "card" && (
+                  <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => confirmDebtPayment(d)}>✅ Valider le paiement (argent reçu)</button>
+                )}
+                {d.method === "card" && (
+                  <p style={{ fontSize: 11, color: "#3b82f6", textAlign: "center", fontWeight: 600 }}>💳 Paiement automatique via Stripe — pas de validation manuelle nécessaire</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -3009,7 +3172,7 @@ function SearchableSelect({ options, value, onChange, placeholder = "— Choisir
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -3506,7 +3669,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
         {/* 💰 DÉTAILS DU SOLDE PROPRIO */}
         {modal.type === "balanceDetail" && (() => {
           const myBookingsAsOwner = (bookings || []).filter(b => b.ownerId === user.id && b.renterConfirmed);
-          const balance = calculateOwnerBalance(user.id, bookings, payouts);
+          const balance = calculateOwnerBalance(user.id, bookings, payouts, debtPayments);
           const isPositive = balance >= 0;
 
           // 📅 Date du DERNIER retrait payé (pour solder l'historique antérieur)
@@ -3675,6 +3838,104 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
               {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600, marginBottom: 10 }}>⚠️ {formError}</div>}
 
               <button className="btn btn-ghost" style={{ width: "100%" }} onClick={() => { set("withdrawAmount", ""); setFormError(""); setModal({ type: "balanceDetail" }); }}>Annuler</button>
+            </>
+          );
+        })()}
+
+        {/* 💳 RÉGLER UNE DETTE (3 méthodes) */}
+        {modal.type === "payDebt" && (() => {
+          const debtAmount = modal.data?.amount || 0;
+          const selectedMethod = modal.data?.selectedMethod || null;
+          // 🏦 Coordonnées Locatzy à afficher (à personnaliser par Zaki)
+          const LOCATZY_RIB = "FR76 XXXX XXXX XXXX XXXX XXXX XXX";
+          const LOCATZY_BANK = "Locatzy SAS — [À CONFIGURER]";
+          const LOCATZY_WAFACASH = "+212 6 XX XX XX XX";
+          const LOCATZY_WAFACASH_NAME = "[À CONFIGURER]";
+          return (
+            <>
+              <h2 className="display" style={{ fontSize: 22, marginBottom: 6 }}>💳 Régler ma dette</h2>
+              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 14 }}>Choisissez votre méthode de paiement</p>
+
+              {/* Montant à régler */}
+              <div style={{ background: "linear-gradient(135deg,#dc2626,#991b1b)", color: "white", borderRadius: 14, padding: 16, marginBottom: 18, textAlign: "center" }}>
+                <p style={{ fontSize: 12, opacity: 0.9 }}>Montant à régler</p>
+                <p style={{ fontSize: 32, fontWeight: 800 }}>{debtAmount}€</p>
+              </div>
+
+              {/* Pas de méthode choisie → afficher les 3 options */}
+              {!selectedMethod && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <button onClick={() => setModal({ type: "payDebt", data: { amount: debtAmount, selectedMethod: "card" } })} style={{ padding: 16, borderRadius: 12, background: "linear-gradient(135deg,#3b82f6,#2563eb)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer", border: "none", textAlign: "left" }}>
+                    <div style={{ fontSize: 17, marginBottom: 4 }}>💳 Carte bancaire</div>
+                    <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 500 }}>Paiement instantané et sécurisé (Stripe)</div>
+                  </button>
+                  <button onClick={() => setModal({ type: "payDebt", data: { amount: debtAmount, selectedMethod: "transfer" } })} style={{ padding: 16, borderRadius: 12, background: "linear-gradient(135deg,#0d9488,#14b8a6)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer", border: "none", textAlign: "left" }}>
+                    <div style={{ fontSize: 17, marginBottom: 4 }}>🏦 Virement bancaire</div>
+                    <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 500 }}>Validation manuelle après réception (1-3 jours)</div>
+                  </button>
+                  <button onClick={() => setModal({ type: "payDebt", data: { amount: debtAmount, selectedMethod: "wafacash" } })} style={{ padding: 16, borderRadius: 12, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer", border: "none", textAlign: "left" }}>
+                    <div style={{ fontSize: 17, marginBottom: 4 }}>💵 Cash / Wafacash</div>
+                    <div style={{ fontSize: 12, opacity: 0.9, fontWeight: 500 }}>Envoi par Wafacash, Cashplus ou similaire</div>
+                  </button>
+                </div>
+              )}
+
+              {/* Méthode CARTE */}
+              {selectedMethod === "card" && (
+                <div>
+                  <div style={{ background: "#dbeafe", borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                    <p style={{ fontSize: 13, color: "#1e40af", fontWeight: 600 }}>💳 Vous allez être redirigé vers Stripe pour payer en toute sécurité. Votre solde sera mis à jour immédiatement.</p>
+                  </div>
+                  <button onClick={() => payerDetteAvecStripe(debtAmount)} style={{ width: "100%", padding: 14, borderRadius: 12, background: "linear-gradient(135deg,#3b82f6,#2563eb)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer", border: "none", marginBottom: 10 }}>
+                    💳 Payer {debtAmount}€ par carte
+                  </button>
+                  <button className="btn btn-ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "payDebt", data: { amount: debtAmount } })}>← Retour</button>
+                </div>
+              )}
+
+              {/* Méthode VIREMENT */}
+              {selectedMethod === "transfer" && (
+                <div>
+                  <div style={{ background: "#f0fdfa", borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                    <p style={{ fontSize: 12, color: "#0d9488", fontWeight: 700, marginBottom: 8 }}>🏦 Coordonnées bancaires Locatzy</p>
+                    <p style={{ fontSize: 13, marginBottom: 6 }}><strong>Bénéficiaire :</strong> {LOCATZY_BANK}</p>
+                    <p style={{ fontSize: 13, marginBottom: 6 }}><strong>IBAN/RIB :</strong> <code style={{ background: "white", padding: "2px 6px", borderRadius: 4, fontSize: 12 }}>{LOCATZY_RIB}</code></p>
+                    <p style={{ fontSize: 13, marginBottom: 6 }}><strong>Montant :</strong> {debtAmount}€</p>
+                    <p style={{ fontSize: 12, color: "#6b7280", marginTop: 8 }}>📌 Indiquez votre email <strong>{user.email}</strong> en référence du virement.</p>
+                  </div>
+                  <button onClick={async () => {
+                    const r = await declareDebtPayment(debtAmount, "transfer");
+                    if (r?.ok) setModal(null);
+                  }} style={{ width: "100%", padding: 14, borderRadius: 12, background: "linear-gradient(135deg,#0d9488,#14b8a6)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer", border: "none", marginBottom: 10 }}>
+                    ✅ J'ai effectué le virement
+                  </button>
+                  <button className="btn btn-ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "payDebt", data: { amount: debtAmount } })}>← Retour</button>
+                </div>
+              )}
+
+              {/* Méthode WAFACASH */}
+              {selectedMethod === "wafacash" && (
+                <div>
+                  <div style={{ background: "#fef3c7", borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                    <p style={{ fontSize: 12, color: "#92400e", fontWeight: 700, marginBottom: 8 }}>💵 Coordonnées Wafacash / Cashplus</p>
+                    <p style={{ fontSize: 13, marginBottom: 6 }}><strong>Bénéficiaire :</strong> {LOCATZY_WAFACASH_NAME}</p>
+                    <p style={{ fontSize: 13, marginBottom: 6 }}><strong>Téléphone :</strong> <code style={{ background: "white", padding: "2px 6px", borderRadius: 4, fontSize: 13 }}>{LOCATZY_WAFACASH}</code></p>
+                    <p style={{ fontSize: 13, marginBottom: 6 }}><strong>Montant :</strong> {debtAmount}€</p>
+                    <p style={{ fontSize: 12, color: "#6b7280", marginTop: 8 }}>📌 Envoyez par Wafacash, Cashplus, ou autre. Mentionnez votre email <strong>{user.email}</strong> en référence.</p>
+                  </div>
+                  <button onClick={async () => {
+                    const r = await declareDebtPayment(debtAmount, "wafacash");
+                    if (r?.ok) setModal(null);
+                  }} style={{ width: "100%", padding: 14, borderRadius: 12, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer", border: "none", marginBottom: 10 }}>
+                    ✅ J'ai envoyé l'argent
+                  </button>
+                  <button className="btn btn-ghost" style={{ width: "100%" }} onClick={() => setModal({ type: "payDebt", data: { amount: debtAmount } })}>← Retour</button>
+                </div>
+              )}
+
+              {!selectedMethod && (
+                <button className="btn btn-ghost" style={{ width: "100%", marginTop: 14 }} onClick={() => setModal(null)}>Annuler</button>
+              )}
             </>
           );
         })()}
