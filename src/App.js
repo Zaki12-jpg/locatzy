@@ -340,6 +340,9 @@ export default function App() {
   const [minGuests, setMinGuests] = useState("");
   const [minRating, setMinRating] = useState(0);
   const [wifiOnly, setWifiOnly] = useState(false);
+  const [fuelFilter, setFuelFilter] = useState(""); // 🚗 carburant (essence, diesel, electric, hybrid)
+  const [transFilter, setTransFilter] = useState(""); // ⚙️ transmission (manual, automatic)
+  const [vehicleBodyFilter, setVehicleBodyFilter] = useState(""); // 🚙 type véhicule (suv, berline, citadine, utilitaire)
   const [toast, setToast] = useState(null);
   const [modal, setModal] = useState(null);
 
@@ -893,6 +896,10 @@ export default function App() {
     }
     // WiFi obligatoire (logements seulement)
     if (wifiOnly && isLodging(l.type) && l.wifi !== true) return false;
+    // 🚗 Filtres véhicules (carburant, transmission, type)
+    if (fuelFilter && isVehicle(l.type) && l.fuel !== fuelFilter) return false;
+    if (transFilter && isVehicle(l.type) && l.transmission !== transFilter) return false;
+    if (vehicleBodyFilter && l.type === "car" && l.vehicleType !== vehicleBodyFilter) return false;
     return true;
   });
 
@@ -1231,7 +1238,7 @@ export default function App() {
         <button className="nav-btn mobile-only" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 Explorer</button>
       </nav>
 
-      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
+      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} setPage={setPage} />}
@@ -1385,7 +1392,7 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
 }
 
 // ─── HOME ────────────────────────────────────────────────────────────
-function Home({ listings, filter, setFilter, country, setCountry, countries, search, setSearch, setModal, openDetail, openOwner, dateFrom, setDateFrom, dateTo, setDateTo, user, onToggleFav, priceMin, setPriceMin, priceMax, setPriceMax, minRooms, setMinRooms, minGuests, setMinGuests, minRating, setMinRating, wifiOnly, setWifiOnly }) {
+function Home({ listings, filter, setFilter, country, setCountry, countries, search, setSearch, setModal, openDetail, openOwner, dateFrom, setDateFrom, dateTo, setDateTo, user, onToggleFav, priceMin, setPriceMin, priceMax, setPriceMax, minRooms, setMinRooms, minGuests, setMinGuests, minRating, setMinRating, wifiOnly, setWifiOnly, fuelFilter, setFuelFilter, transFilter, setTransFilter, vehicleBodyFilter, setVehicleBodyFilter }) {
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [selectedDropdownCountry, setSelectedDropdownCountry] = useState("");
   const [lodgingDropdownOpen, setLodgingDropdownOpen] = useState(false);
@@ -1438,9 +1445,9 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
             <button className={`pill ${country !== "all" ? "active" : ""}`} onClick={() => setCountryDropdownOpen(!countryDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
               {country === "all" ? "🌍 Pays" : country} ▾
             </button>
-            <button className={`pill ${(priceMin || priceMax || minRooms || minGuests || minRating > 0 || wifiOnly) ? "active" : ""}`} onClick={() => setAdvancedDropdownOpen(!advancedDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <button className={`pill ${(priceMin || priceMax || minRooms || minGuests || minRating > 0 || wifiOnly || fuelFilter || transFilter || vehicleBodyFilter) ? "active" : ""}`} onClick={() => setAdvancedDropdownOpen(!advancedDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
               ⚙️ Filtres {(() => {
-                const count = [priceMin, priceMax, minRooms, minGuests, minRating > 0, wifiOnly].filter(Boolean).length;
+                const count = [priceMin, priceMax, minRooms, minGuests, minRating > 0, wifiOnly, fuelFilter, transFilter, vehicleBodyFilter].filter(Boolean).length;
                 return count > 0 ? `(${count})` : "";
               })()} ▾
             </button>
@@ -1515,10 +1522,43 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
                 </div>
               </div>
 
+              {/* 🚙 Type de véhicule (voitures) */}
+              <div style={{ marginBottom: 20 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>🚙 Type de véhicule (voitures)</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  <button onClick={() => setVehicleBodyFilter("")} style={{ padding: 10, borderRadius: 10, border: vehicleBodyFilter === "" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: vehicleBodyFilter === "" ? "#f0fdfa" : "white", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Peu importe</button>
+                  {VEHICLE_BODY_TYPES.map(v => (
+                    <button key={v.value} onClick={() => setVehicleBodyFilter(v.value)} style={{ padding: 10, borderRadius: 10, border: vehicleBodyFilter === v.value ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: vehicleBodyFilter === v.value ? "#f0fdfa" : "white", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>{v.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ⛽ Carburant */}
+              <div style={{ marginBottom: 20 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>⛽ Carburant (véhicules)</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  <button onClick={() => setFuelFilter("")} style={{ padding: 10, borderRadius: 10, border: fuelFilter === "" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: fuelFilter === "" ? "#f0fdfa" : "white", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Peu importe</button>
+                  {Object.entries(FUEL_LABELS).map(([key, label]) => (
+                    <button key={key} onClick={() => setFuelFilter(key)} style={{ padding: 10, borderRadius: 10, border: fuelFilter === key ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: fuelFilter === key ? "#f0fdfa" : "white", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>{label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ⚙️ Transmission */}
+              <div style={{ marginBottom: 20 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>⚙️ Transmission (véhicules)</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                  <button onClick={() => setTransFilter("")} style={{ padding: 10, borderRadius: 10, border: transFilter === "" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: transFilter === "" ? "#f0fdfa" : "white", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Peu importe</button>
+                  {Object.entries(TRANS_LABELS).map(([key, label]) => (
+                    <button key={key} onClick={() => setTransFilter(key)} style={{ padding: 10, borderRadius: 10, border: transFilter === key ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: transFilter === key ? "#f0fdfa" : "white", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>{label}</button>
+                  ))}
+                </div>
+              </div>
+
               {/* Boutons */}
               <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
                 <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => {
-                  setPriceMin(""); setPriceMax(""); setMinRooms(""); setMinGuests(""); setMinRating(0); setWifiOnly(false);
+                  setPriceMin(""); setPriceMax(""); setMinRooms(""); setMinGuests(""); setMinRating(0); setWifiOnly(false); setFuelFilter(""); setTransFilter(""); setVehicleBodyFilter("");
                 }}>Réinitialiser</button>
                 <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setAdvancedDropdownOpen(false)}>Appliquer ({listings.length} résultats)</button>
               </div>
