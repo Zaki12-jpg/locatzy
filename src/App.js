@@ -514,8 +514,8 @@ export default function App() {
           // Le solde vient de devenir négatif → on enregistre la date
           if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { balanceWentNegativeAt: new Date().toISOString() });
         } else if (balance >= 0 && alreadyMarked) {
-          // Le solde est repassé à 0 ou positif → on efface la date et on réactive
-          if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { balanceWentNegativeAt: null, accountStatus: "active" });
+          // Le solde est repassé à 0 ou positif → on efface la date, on réactive et on reset les notifs envoyées
+          if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { balanceWentNegativeAt: null, accountStatus: "active", notifiedJ3: false, notifiedJ6: false, notifiedJ7: false });
         }
       } catch (e) { console.log("Erreur surveillance solde:", e); }
     });
@@ -530,10 +530,31 @@ export default function App() {
       users.forEach(async (u) => {
         if (!u.balanceWentNegativeAt) return;
         const daysSince = (Date.now() - new Date(u.balanceWentNegativeAt).getTime()) / 86400000;
-        if (daysSince >= 7 && u.accountStatus !== "deactivated") {
-          // Plus de 7 jours → désactiver
+
+        // 🔔 J+3 : rappel amical
+        if (daysSince >= 3 && !u.notifiedJ3) {
           try {
-            if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { accountStatus: "deactivated" });
+            addNotif(u.id, `⏰ Rappel : il vous reste 4 jours pour régler votre solde. Sinon vos annonces seront masquées.`, "payment_reminder");
+            sendEmail(u.email, "Locatzy — Rappel de paiement", `Bonjour ${u.name},\n\nVous avez un solde négatif depuis 3 jours. Il vous reste 4 jours pour régler vos commissions avant que vos annonces soient masquées.\n\nMerci de régler votre solde dans votre espace Locatzy.\n\nL'équipe Locatzy`);
+            if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { notifiedJ3: true });
+          } catch (e) { console.log("Erreur notif J+3:", e); }
+        }
+
+        // 🔔 J+6 : urgent (1 jour restant)
+        if (daysSince >= 6 && !u.notifiedJ6) {
+          try {
+            addNotif(u.id, `🚨 URGENT : votre compte sera DÉSACTIVÉ demain si vous ne réglez pas votre solde !`, "payment_urgent");
+            sendEmail(u.email, "Locatzy — URGENT : compte désactivé demain", `Bonjour ${u.name},\n\n⚠️ ATTENTION : votre compte Locatzy sera DÉSACTIVÉ demain si vous ne réglez pas vos commissions impayées.\n\nVos annonces ne seront plus visibles aux clients tant que votre solde restera négatif.\n\nRéglez immédiatement votre solde dans votre espace Locatzy.\n\nL'équipe Locatzy`);
+            if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { notifiedJ6: true });
+          } catch (e) { console.log("Erreur notif J+6:", e); }
+        }
+
+        // 🚫 J+7 : désactivation + notif
+        if (daysSince >= 7 && u.accountStatus !== "deactivated") {
+          try {
+            if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { accountStatus: "deactivated", notifiedJ7: true });
+            addNotif(u.id, `🚫 Votre compte a été DÉSACTIVÉ. Vos annonces ne sont plus visibles aux clients. Réglez votre solde pour le réactiver.`, "account_deactivated");
+            sendEmail(u.email, "Locatzy — Compte désactivé", `Bonjour ${u.name},\n\n🚫 Votre compte Locatzy a été DÉSACTIVÉ car votre solde est resté négatif plus de 7 jours.\n\nVos annonces ne sont plus visibles aux clients. Pour réactiver votre compte, réglez votre solde dans votre espace Locatzy.\n\nL'équipe Locatzy`);
           } catch (e) { console.log("Erreur désactivation:", e); }
         }
       });
