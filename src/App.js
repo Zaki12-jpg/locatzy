@@ -2445,8 +2445,15 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 28 }}>
         <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📋 Mes annonces</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{myListings.length}</div></div>
         <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📅 Réservations reçues</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{bookingsOnMyListings.length}</div></div>
-        <div className="card" style={{ padding: 22, background: "linear-gradient(135deg,#14b8a6,#0d9488)", color: "white", border: "none" }}><div style={{ fontSize: 13, opacity: 0.9 }}>💰 Mes gains</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{totalEarnings.toFixed(2)}€</div></div>
-        {/* 💼 Mon solde (ce qui reste à recevoir / ce que tu dois) */}
+
+        {/* 💰 Mes gains (total cumulé depuis le début) */}
+        <div className="card" style={{ padding: 22, background: "linear-gradient(135deg,#14b8a6,#0d9488)", color: "white", border: "none" }}>
+          <div style={{ fontSize: 13, opacity: 0.9 }}>💰 Mes gains</div>
+          <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{totalEarnings.toFixed(2)}€</div>
+          <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>Total cumulé depuis le début</div>
+        </div>
+
+        {/* 💼 Mon solde (argent disponible MAINTENANT) */}
         {(() => {
           const balance = calculateOwnerBalance(user.id, bookings, payouts);
           const isPositive = balance >= 0;
@@ -2464,13 +2471,44 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
           return (
             <div onClick={() => setModal({ type: "balanceDetail" })} className="card" style={{ padding: 22, background: bg, color: "white", border: "none", cursor: "pointer" }}>
               <div style={{ fontSize: 13, opacity: 0.9 }}>{isDeactivated ? "🚫 Compte désactivé" : "💼 Mon solde"}</div>
-              <div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{isPositive ? "+" : ""}{balance}€</div>
+              <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{isPositive ? "+" : ""}{balance}€</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>Disponible au retrait</div>
               {isDeactivated && (
-                <div style={{ marginTop: 8, fontSize: 11, opacity: 0.95 }}>⛔ Vos annonces ne sont plus visibles</div>
+                <div style={{ marginTop: 6, fontSize: 11, opacity: 0.95 }}>⛔ Annonces non visibles</div>
               )}
               {!isPositive && !isDeactivated && daysLeft !== null && (
-                <div style={{ marginTop: 8, fontSize: 11, opacity: 0.95 }}>⏰ Reste {daysLeft}j pour régler</div>
+                <div style={{ marginTop: 6, fontSize: 11, opacity: 0.95 }}>⏰ Reste {daysLeft}j pour régler</div>
               )}
+            </div>
+          );
+        })()}
+
+        {/* ⏳ Réservations en attente (résas confirmées mais pas encore validées des 2 côtés) */}
+        {(() => {
+          const pendingReservations = bookingsOnMyListings.filter(b =>
+            b.status === "confirmed" && !(b.ownerConfirmed && b.renterConfirmed)
+          );
+          const pendingAmount = pendingReservations.reduce((s, b) => s + (b.ownerEarnings || 0), 0);
+          return (
+            <div className="card" style={{ padding: 22, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", border: "none" }}>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>⏳ Réservations en attente</div>
+              <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{pendingAmount.toFixed(2)}€</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>{pendingReservations.length} en cours (clés non remises)</div>
+            </div>
+          );
+        })()}
+
+        {/* 💸 Solde en attente (retraits demandés mais pas encore versés par l'admin) */}
+        {(() => {
+          const pendingWithdrawals = (payouts || []).filter(p =>
+            p.ownerId === user.id && p.status === "pending"
+          );
+          const pendingWithdrawAmount = pendingWithdrawals.reduce((s, p) => s + (p.amount || 0), 0);
+          return (
+            <div className="card" style={{ padding: 22, background: "linear-gradient(135deg,#3b82f6,#2563eb)", color: "white", border: "none" }}>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>💸 Solde en attente</div>
+              <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{pendingWithdrawAmount.toFixed(2)}€</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>{pendingWithdrawals.length > 0 ? "Retrait en cours de validation" : "Aucun retrait en cours"}</div>
             </div>
           );
         })()}
