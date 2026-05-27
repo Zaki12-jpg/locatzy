@@ -899,7 +899,7 @@ export default function App() {
   const myListings = user ? listings.filter(l => l.ownerId === user.id) : [];
   const myBookingsAsRenter = user ? bookings.filter(b => b.renterId === user.id) : [];
   const bookingsOnMyListings = user ? bookings.filter(b => b.ownerId === user.id) : [];
-  const myNotifications = user ? notifications.filter(n => n.userId === user.id).reverse() : [];
+  const myNotifications = user ? notifications.filter(n => n.userId === user.id).sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
   const unreadCount = myNotifications.filter(n => !n.read).length;
   const myMessages = user ? messages.filter(m => m.fromId === user.id || m.toId === user.id) : [];
   const unreadMessagesCount = myMessages.filter(m => m.toId === user?.id && !m.read).length;
