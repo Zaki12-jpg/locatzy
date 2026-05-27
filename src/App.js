@@ -307,7 +307,8 @@ const isVehicle = (type) => getTypeInfo(type)?.category === "vehicle";
 // APP PRINCIPAL
 // ════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPageRaw] = useState("home");
+  const [pageHistory, setPageHistory] = useState([]); // 🔙 historique des pages visitées (pour le bouton précédent)
   const [selectedListing, setSelectedListing] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [user, setUser] = useState(null);
@@ -1059,6 +1060,26 @@ export default function App() {
     }
   };
 
+  // 🔙 NAVIGATION AVEC HISTORIQUE
+  // setPage enregistre la page actuelle dans l'historique avant de changer,
+  // pour que le bouton "précédent" et le swipe sachent d'où on vient.
+  const setPage = (newPage) => {
+    setPageRaw(prev => {
+      if (newPage !== prev) setPageHistory(h => [...h, prev]);
+      return newPage;
+    });
+  };
+  // Revenir à la page précédente (ou Accueil si l'historique est vide)
+  const goBack = () => {
+    setPageHistory(h => {
+      if (h.length === 0) { setPageRaw("home"); return h; }
+      const previous = h[h.length - 1];
+      setPageRaw(previous);
+      if (previous === "notif") markAllRead();
+      return h.slice(0, -1);
+    });
+  };
+
   // 📱 SWIPE (balayage) entre les pages de la barre du bas, comme Instagram
   // On construit la liste des pages visibles dans l'ordre de la barre du bas.
   const swipePages = ["home"];
@@ -1182,6 +1203,9 @@ export default function App() {
       {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
+        {pageHistory.length > 0 && (
+          <button onClick={goBack} title="Précédent" style={{ background: darkMode ? "#1a1a1a" : "#f3f4f6", borderRadius: "50%", width: 38, height: 38, fontSize: 20, fontWeight: 700, color: darkMode ? "#f5f5f5" : "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 8, flexShrink: 0, cursor: "pointer" }}>←</button>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
           <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 16 }}>L</div>
           <div>
@@ -1206,8 +1230,8 @@ export default function App() {
       </nav>
 
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
-      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
-      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
+      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
+      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} setPage={setPage} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
@@ -1650,7 +1674,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
 }
 
 // ─── OWNER PROFILE PAGE ──────────────────────────────────────────────
-function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage, openDetail, setModal, onToggleFav, openOwner }) {
+function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage, goBack, openDetail, setModal, onToggleFav, openOwner }) {
   const users = DB.get("lcy_users");
   const owner = users.find(u => u.id === ownerId);
   if (!owner) {
@@ -1672,7 +1696,7 @@ function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage,
 
   return (
     <div style={{ padding: "16px" }}>
-      <button onClick={() => setPage("home")} style={{ background: "transparent", padding: "8px 0", fontSize: 14, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}>← Retour</button>
+      <button onClick={() => goBack ? goBack() : setPage("home")} style={{ background: "transparent", padding: "8px 0", fontSize: 14, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}>← Retour</button>
 
       {/* Carte profil */}
       <div className="card" style={{ padding: 24, marginBottom: 16, textAlign: "center" }}>
@@ -1821,7 +1845,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
 }
 
 // ─── DETAIL PAGE ─────────────────────────────────────────────────────
-function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview }) {
+function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
@@ -1854,7 +1878,7 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
     <div style={{ padding: "16px" }}>
       {/* Header retour */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <button onClick={() => setPage("home")} style={{ background: "transparent", padding: "8px 0", color: "#374151", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>← Retour</button>
+        <button onClick={() => goBack ? goBack() : setPage("home")} style={{ background: "transparent", padding: "8px 0", color: "#374151", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>← Retour</button>
         <button onClick={() => onToggleFav(l.id)} style={{ background: "#f3f4f6", borderRadius: 50, padding: "8px 14px", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
           {user && isFavorite(user.id, l.id) ? "❤️ Favori" : "🤍 Ajouter aux favoris"}
         </button>
