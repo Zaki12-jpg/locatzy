@@ -272,6 +272,20 @@ const TRANS_LABELS = {
   "automatic": "🤖 Automatique",
 };
 
+// 🚗 Types de carrosserie pour les voitures (SUV, Berline, etc.)
+const VEHICLE_BODY_TYPES = [
+  { value: "suv", label: "🚙 SUV / 4x4" },
+  { value: "berline", label: "🚗 Berline" },
+  { value: "citadine", label: "🚘 Citadine" },
+  { value: "utilitaire", label: "🚐 Utilitaire" },
+];
+const VEHICLE_BODY_LABELS = {
+  "suv": "🚙 SUV / 4x4",
+  "berline": "🚗 Berline",
+  "citadine": "🚘 Citadine",
+  "utilitaire": "🚐 Utilitaire",
+};
+
 // 🏘 Types de biens (5 catégories)
 const PROPERTY_TYPES = {
   "apartment": { icon: "🏠", label: "Appartement", labelShort: "Apparts", labelFull: "Logement entier", bgGradient: "linear-gradient(135deg,#fef3c7,#fde68a)", category: "lodging" },
@@ -282,8 +296,12 @@ const PROPERTY_TYPES = {
 };
 
 // Helper : sait si c'est un type "logement" (avec chambres/personnes)
-const isLodging = (type) => PROPERTY_TYPES[type]?.category === "lodging";
-const isVehicle = (type) => PROPERTY_TYPES[type]?.category === "vehicle";
+// 🏷️ CUSTOM_LODGING_CACHE est rempli depuis Firebase (types ajoutés par les proprios).
+// Tous les types custom sont des LOGEMENTS. Clé = id "custom_xxx", valeur = { label, icon }.
+const CUSTOM_LODGING_CACHE = {};
+const getTypeInfo = (type) => PROPERTY_TYPES[type] || CUSTOM_LODGING_CACHE[type] || null;
+const isLodging = (type) => getTypeInfo(type)?.category === "lodging";
+const isVehicle = (type) => getTypeInfo(type)?.category === "vehicle";
 
 // ════════════════════════════════════════════════════════════════════
 // APP PRINCIPAL
@@ -294,6 +312,8 @@ export default function App() {
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [user, setUser] = useState(null);
   const [listings, setListings] = useState([]);
+  const [customLodgingTypes, setCustomLodgingTypes] = useState([]); // 🏷️ types de logement ajoutés par les proprios (Firebase)
+  const [lodgingCacheVersion, setLodgingCacheVersion] = useState(0); // force re-render quand le cache des types custom change
   const [bookings, setBookings] = useState([]);
   const [users, setUsers] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -350,6 +370,13 @@ export default function App() {
       DB.set("lcy_listings", fbListings); // garder une copie locale
     }, (err) => {
       console.log("Firebase listings error:", err);
+    });
+    // 🔥 FIREBASE : écouter les types de logement ajoutés par les proprios (partagés par tous)
+    const unsubLodgingTypes = onSnapshot(collection(db, "customLodgingTypes"), (snapshot) => {
+      const fbTypes = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setCustomLodgingTypes(fbTypes);
+    }, (err) => {
+      console.log("Firebase customLodgingTypes error:", err);
     });
     // 🔥 FIREBASE : écouter les comptes en temps réel (partagés entre appareils)
     const unsubUsers = onSnapshot(collection(db, "users"), async (snapshot) => {
@@ -416,8 +443,26 @@ export default function App() {
     }, (err) => {
       console.log("Firebase payouts error:", err);
     });
-    return () => { unsub(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); unsubPayouts(); };
+    return () => { unsub(); unsubLodgingTypes(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); unsubPayouts(); };
   }, []);
+
+  // 🏷️ Remplir le cache global des types de logement custom (pour isLodging, icônes, labels)
+  useEffect(() => {
+    // On vide puis remplit le cache à chaque mise à jour Firebase
+    Object.keys(CUSTOM_LODGING_CACHE).forEach(k => delete CUSTOM_LODGING_CACHE[k]);
+    customLodgingTypes.forEach(t => {
+      CUSTOM_LODGING_CACHE["custom_" + t.fbId] = {
+        icon: "🏷️",
+        label: t.label,
+        labelShort: t.label,
+        labelFull: t.label,
+        bgGradient: "linear-gradient(135deg,#ede9fe,#ddd6fe)",
+        category: "lodging",
+      };
+    });
+    // Forcer un petit re-render pour que les composants relisent le cache
+    setLodgingCacheVersion(v => v + 1);
+  }, [customLodgingTypes]);
 
   // 💳 Détecter le retour de paiement Stripe et créer la réservation
   useEffect(() => {
@@ -610,6 +655,30 @@ export default function App() {
     }
   };
 
+  // 🏷️ Ajouter un nouveau type de logement partagé (visible chez tous les proprios)
+  const addLodgingType = async (label) => {
+    const clean = (label || "").trim();
+    if (!clean) return { ok: false, error: "Nom du type vide" };
+    // Vérifier qu'il n'existe pas déjà (types par défaut OU types custom), insensible à la casse
+    const existsDefault = Object.values(PROPERTY_TYPES).some(t => t.category === "lodging" && t.label.toLowerCase() === clean.toLowerCase());
+    const existsCustom = customLodgingTypes.some(t => (t.label || "").toLowerCase() === clean.toLowerCase());
+    if (existsDefault || existsCustom) return { ok: false, error: "Ce type existe déjà" };
+    try {
+      await addDoc(collection(db, "customLodgingTypes"), {
+        label: clean,
+        createdBy: user?.id || "",
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      });
+      flash(`✓ Type "${clean}" créé ! Il sera visible par tous une fois votre annonce validée par l'admin.`);
+      return { ok: true };
+    } catch (err) {
+      console.log("Erreur ajout type de logement Firebase:", err);
+      flash("Erreur lors de l'ajout du type. Réessayez.", "#ef4444");
+      return { ok: false, error: "Erreur réseau" };
+    }
+  };
+
   // ✏️ Modifier une annonce existante
   const updateListing = async (listing, data) => {
     if (!listing.fbId) { flash("Erreur annonce", "#ef4444"); return; }
@@ -697,6 +766,7 @@ export default function App() {
       // Infos personnelles du locataire
       renterFullName: info.fullName || user.name,
       renterPhone: info.phone || "",
+      renterGuestsCount: info.guestsCount || null,
       renterIdType: info.idType || "",
       renterIdNumber: info.idNumber || "",
       renterNote: info.note || "",
@@ -778,7 +848,21 @@ export default function App() {
     addNotif(toUserId, `💬 Nouveau message de ${user.name}`, "message");
   };
 
-  const approveListing = async (fbId) => { try { await updateDoc(doc(db, "listings", fbId), { status: "approved" }); flash("Annonce approuvée"); } catch (e) { flash("Erreur", "#ef4444"); } };
+  const approveListing = async (fbId) => {
+    try {
+      await updateDoc(doc(db, "listings", fbId), { status: "approved" });
+      // 🏷️ Si l'annonce utilise un type de logement custom encore en attente, l'approuver aussi
+      const l = listings.find(x => x.fbId === fbId);
+      if (l && typeof l.type === "string" && l.type.startsWith("custom_")) {
+        const typeFbId = l.type.slice("custom_".length);
+        const ct = customLodgingTypes.find(t => t.fbId === typeFbId);
+        if (ct && ct.status !== "approved") {
+          await updateDoc(doc(db, "customLodgingTypes", typeFbId), { status: "approved" });
+        }
+      }
+      flash("Annonce approuvée");
+    } catch (e) { flash("Erreur", "#ef4444"); }
+  };
   const rejectListing = async (fbId) => { try { await updateDoc(doc(db, "listings", fbId), { status: "rejected" }); flash("Annonce refusée", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
   const deleteListing = async (fbId) => { try { await deleteDoc(doc(db, "listings", fbId)); flash("Annonce supprimée", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
   const deleteUser = async (fbId) => { try { await deleteDoc(doc(db, "users", fbId)); flash("Utilisateur supprimé", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
@@ -1060,7 +1144,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -1643,7 +1727,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
   return (
     <div className="card" onClick={onOpen} style={{ cursor: "pointer" }}>
       <div
-        style={{ height: 200, position: "relative", background: PROPERTY_TYPES[l.type]?.bgGradient || "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}
+        style={{ height: 200, position: "relative", background: getTypeInfo(l.type)?.bgGradient || "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}
         onTouchStart={(e) => { e.currentTarget.dataset.touchx = e.touches[0].clientX; }}
         onTouchEnd={(e) => {
           if (l.photos.length <= 1) return;
@@ -1656,7 +1740,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
           }
         }}
       >
-        {isImage ? <img src={photo} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 80 }}>{photo || PROPERTY_TYPES[l.type]?.icon || "🏠"}</span>}
+        {isImage ? <img src={photo} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 80 }}>{photo || getTypeInfo(l.type)?.icon || "🏠"}</span>}
         {/* Flèches de navigation (si plusieurs photos) */}
         {l.photos.length > 1 && (
           <>
@@ -1665,7 +1749,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
           </>
         )}
         {l.photos.length > 1 && <div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>{l.photos.map((_, i) => <button key={i} onClick={() => setIdx(i)} style={{ width: 8, height: 8, borderRadius: "50%", border: "none", background: i === idx ? "white" : "rgba(255,255,255,0.5)" }} />)}</div>}
-        <span style={{ position: "absolute", top: 12, left: 12, background: "white", borderRadius: 50, padding: "5px 12px", fontSize: 11, fontWeight: 700 }}>{PROPERTY_TYPES[l.type]?.icon} {PROPERTY_TYPES[l.type]?.label}</span>
+        <span style={{ position: "absolute", top: 12, left: 12, background: "white", borderRadius: 50, padding: "5px 12px", fontSize: 11, fontWeight: 700 }}>{getTypeInfo(l.type)?.icon} {getTypeInfo(l.type)?.label}</span>
         <span style={{ position: "absolute", top: 12, right: 50, background: "rgba(0,0,0,0.7)", color: "white", borderRadius: 50, padding: "5px 12px", fontSize: 11, fontWeight: 600 }}>{l.country}</span>
         {/* ❤️ Bouton favoris */}
         <button onClick={(e) => { e.stopPropagation(); onToggleFav(l.id); }} style={{ position: "absolute", top: 10, right: 10, width: 34, height: 34, borderRadius: "50%", background: "rgba(255,255,255,0.95)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
@@ -1689,7 +1773,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
             🎁 Offre {l.offerMinDays}+ jours : {l.offerPrice}€/j (au lieu de {l.price}€)
           </div>
         )}
-        <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 12 }}>📍 {l.city} · {isLodging(l.type) ? `🛏 ${l.rooms} ch · 👥 ${l.guests} pers${l.wifi === true ? " · 📶" : l.wifi === false ? " · 🚫📶" : ""}` : `💺 ${l.seats} pl · ${FUEL_LABELS[l.fuel] || "⛽"}`}</p>
+        <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 12 }}>📍 {l.city} · {isLodging(l.type) ? `🛏 ${l.rooms} ch · 👥 ${l.guests} pers${l.wifi === true ? " · 📶" : l.wifi === false ? " · 🚫📶" : ""}` : `💺 ${l.seats} pl${l.vehicleType ? ` · ${VEHICLE_BODY_LABELS[l.vehicleType] || l.vehicleType}` : ""} · ${FUEL_LABELS[l.fuel] || "⛽"}`}</p>
         <p style={{ color: "#4b5563", fontSize: 13, lineHeight: 1.5, marginBottom: 14, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{l.desc}</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 14, borderTop: "1px solid #f0f0f0", gap: 8 }} onClick={e => e.stopPropagation()}>
           <span style={{ fontSize: 12, color: "#6b7280", flex: 1 }}>Par <strong onClick={(e) => { e.stopPropagation(); if (openOwner) openOwner(l.ownerId); }} style={{ color: "#14b8a6", cursor: "pointer", textDecoration: "underline" }}>{l.ownerName}</strong></span>
@@ -1762,7 +1846,7 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
         {/* Photo principale avec navigation */}
         <div
           className="detail-main-photo"
-          style={{ background: PROPERTY_TYPES[l.type]?.bgGradient || "#f3f4f6", height: 460, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", borderRadius: 20, overflow: "hidden" }}
+          style={{ background: getTypeInfo(l.type)?.bgGradient || "#f3f4f6", height: 460, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", borderRadius: 20, overflow: "hidden" }}
           onClick={() => setShowAllPhotos(true)}
           onTouchStart={(e) => { e.currentTarget.dataset.touchx = e.touches[0].clientX; }}
           onTouchEnd={(e) => {
@@ -1775,7 +1859,7 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
             }
           }}
         >
-          {isImage ? <img src={photo} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 140 }}>{photo || PROPERTY_TYPES[l.type]?.icon || "🏠"}</span>}
+          {isImage ? <img src={photo} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 140 }}>{photo || getTypeInfo(l.type)?.icon || "🏠"}</span>}
 
           {/* Flèches de navigation (si plusieurs photos) */}
           {l.photos.length > 1 && (
@@ -1837,8 +1921,8 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
         {/* Type + caractéristiques */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 20, borderBottom: "1px solid #e5e7eb", marginBottom: 24 }}>
           <div>
-            <h2 className="display" style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{PROPERTY_TYPES[l.type]?.icon} {PROPERTY_TYPES[l.type]?.labelFull || l.type}</h2>
-            <p style={{ color: "#6b7280", fontSize: 14 }}>{isLodging(l.type) ? `${l.rooms} chambre${l.rooms > 1 ? "s" : ""} · ${l.guests} personnes max` : `${l.seats} places`}</p>
+            <h2 className="display" style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{getTypeInfo(l.type)?.icon} {getTypeInfo(l.type)?.labelFull || l.type}</h2>
+            <p style={{ color: "#6b7280", fontSize: 14 }}>{isLodging(l.type) ? `${l.rooms} chambre${l.rooms > 1 ? "s" : ""} · ${l.guests} personnes max` : `${l.seats} places${l.vehicleType ? ` · ${VEHICLE_BODY_LABELS[l.vehicleType] || l.vehicleType}` : ""}`}</p>
           </div>
           <div style={{ width: 54, height: 54, borderRadius: "50%", background: "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 22 }}>{l.ownerName[0]}</div>
         </div>
@@ -1893,13 +1977,14 @@ function DetailPage({ listing: l, user, setPage, setModal, reviews, bookings, me
                 <Feature icon="🛏" label={`${l.rooms} chambre${l.rooms > 1 ? "s" : ""}`} />
                 <Feature icon="👥" label={`Jusqu'à ${l.guests} personnes`} />
                 <Feature icon={l.wifi === true ? "📶" : l.wifi === false ? "🚫" : "📶"} label={l.wifi === true ? "WiFi inclus" : l.wifi === false ? "Pas de WiFi" : "WiFi (à confirmer)"} />
-                <Feature icon={PROPERTY_TYPES[l.type]?.icon || "🏠"} label={PROPERTY_TYPES[l.type]?.labelFull || "Logement"} />
+                <Feature icon={getTypeInfo(l.type)?.icon || "🏠"} label={getTypeInfo(l.type)?.labelFull || "Logement"} />
                 <Feature icon="📍" label={`${l.city}, ${l.country}`} />
                 <Feature icon="💰" label={`${l.price}€ / nuit`} />
               </>
             ) : (
               <>
                 <Feature icon="💺" label={`${l.seats} places`} />
+                {l.vehicleType && <Feature icon="🚙" label={VEHICLE_BODY_LABELS[l.vehicleType] || l.vehicleType} />}
                 <Feature icon="📍" label={`Disponible à ${l.city}`} />
                 <Feature icon="" label={FUEL_LABELS[l.fuel] || "⛽ Carburant non précisé"} />
                 <Feature icon="" label={TRANS_LABELS[l.transmission] || "⚙️ Boîte non précisée"} />
@@ -2190,7 +2275,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
                 <div>
                   <h3 style={{ fontWeight: 700, marginBottom: 4 }}>{b.listingTitle}</h3>
                   <p style={{ color: "#0a0a0a", fontSize: 14, fontWeight: 600 }}>👤 {b.renterName} ({b.renterEmail})</p>
-                  <p style={{ color: "#6b7280", fontSize: 13 }}>📅 {b.from} → {b.to} ({b.days}j)</p>
+                  <p style={{ color: "#6b7280", fontSize: 13 }}>📅 {b.from} → {b.to} ({b.days}j){b.renterGuestsCount ? ` · 👥 ${b.renterGuestsCount} pers` : ""}</p>
                 </div>
                 <Status status={b.status} />
               </div>
@@ -2383,7 +2468,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
             <h3 style={{ fontWeight: 700, marginBottom: 16 }}>⏳ À modérer ({pending.length})</h3>
             {pending.length === 0 ? <p style={{ color: "#9ca3af", padding: 12 }}>✅ Tout est à jour</p> : pending.slice(0,5).map(l => (
               <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
-                <span style={{ fontSize: 24 }}>{PROPERTY_TYPES[l.type] && PROPERTY_TYPES[l.type].icon || "🏠"}</span>
+                <span style={{ fontSize: 24 }}>{getTypeInfo(l.type) && getTypeInfo(l.type).icon || "🏠"}</span>
                 <div style={{ flex: 1 }}><strong style={{ fontSize: 14 }}>{l.title}</strong><p style={{ fontSize: 12, color: "#6b7280" }}>{l.ownerName} · {l.city}</p></div>
                 <button className="btn btn-accent" style={{ padding: "6px 14px", fontSize: 12 }} onClick={() => approveListing(l.fbId)}>✓</button>
                 <button className="btn" style={{ background: "#fee2e2", color: "#dc2626", padding: "6px 14px", fontSize: 12 }} onClick={() => rejectListing(l.fbId)}>✗</button>
@@ -2424,7 +2509,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {bookings.length === 0 ? <Empty icon="💰" msg="Aucune réservation" /> : [...bookings].reverse().map(b => (
               <div key={b.id} className="card" style={{ padding: 20 }}>
-                <h4 style={{ fontWeight: 700, marginBottom: 8 }}>{PROPERTY_TYPES[b.listingType] && PROPERTY_TYPES[b.listingType].icon || "🏠"} {b.listingTitle}</h4>
+                <h4 style={{ fontWeight: 700, marginBottom: 8 }}>{getTypeInfo(b.listingType) && getTypeInfo(b.listingType).icon || "🏠"} {b.listingTitle}</h4>
                 <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>📅 {b.from} → {b.to} · {b.renterName} → {b.ownerName}</p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, borderTop: "1px dashed #e5e7eb", paddingTop: 12 }}>
                   <div><p style={{ fontSize: 11, color: "#6b7280" }}>Total</p><p className="display" style={{ fontWeight: 700, fontSize: 18 }}>{b.subtotal}€</p></div>
@@ -2473,7 +2558,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {listings.map(l => (
             <div key={l.id} className="card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16 }}>
-              <span style={{ fontSize: 24 }}>{PROPERTY_TYPES[l.type] && PROPERTY_TYPES[l.type].icon || "🏠"}</span>
+              <span style={{ fontSize: 24 }}>{getTypeInfo(l.type) && getTypeInfo(l.type).icon || "🏠"}</span>
               <div style={{ flex: 1 }}>
                 <h4 style={{ fontWeight: 700, fontSize: 14 }}>{l.title}</h4>
                 <p style={{ color: "#6b7280", fontSize: 12 }}>📍 {l.city}, {l.country} · {l.ownerName}</p>
@@ -2527,7 +2612,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -2545,7 +2630,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
     // ✏️ Pré-remplir le formulaire avec l'annonce à modifier
     if (modal?.type === "edit" && modal.data) {
       const l = modal.data;
-      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "" });
+      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "", vehicleType: l.vehicleType || "" });
       // Pré-charger les photos existantes (sauf si c'est juste un emoji par défaut)
       setPhotos(Array.isArray(l.photos) && l.photos.length > 0 && l.photos[0].startsWith("data:") ? l.photos : []);
     }
@@ -2740,15 +2825,41 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
             <h2 className="display" style={{ fontWeight: 800, fontSize: 26, marginBottom: 8 }}>{modal.type === "edit" ? "✏️ Modifier l'annonce" : "📝 Publier une annonce"}</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Type *</label>
-                <select className="input" value={form.type || ""} onChange={e => set("type", e.target.value)}>
+                <select className="input" value={form.type || ""} onChange={e => {
+                  if (e.target.value === "__addType__") { set("showAddType", true); return; }
+                  set("type", e.target.value);
+                }}>
                   <option value="">— Choisir —</option>
                   <option value="apartment">🏠 Appartement</option>
                   <option value="house">🏡 Villa / Maison</option>
                   <option value="hotel">🏨 Hôtel</option>
+                  {(customLodgingTypes || []).filter(t => t.status === "approved" || t.createdBy === user?.id).map(t => (
+                    <option key={t.fbId} value={"custom_" + t.fbId}>🏷️ {t.label}{t.status !== "approved" ? " (en attente)" : ""}</option>
+                  ))}
                   <option value="car">🚗 Voiture</option>
                   <option value="moto">🏍 Moto / Scooter</option>
+                  <option value="__addType__">➕ Ajouter un type de logement…</option>
                 </select>
               </div>
+              {form.showAddType && (
+                <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 12, padding: 14 }}>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: "#6d28d9", display: "block", marginBottom: 6 }}>🏷️ Nouveau type de logement</label>
+                  <p style={{ fontSize: 11, color: "#7c3aed", marginBottom: 8 }}>Ex : Riad, Chalet, Bungalow… Ce type sera disponible pour tous les propriétaires.</p>
+                  <input className="input" placeholder="Nom du type (ex : Riad)" value={form.newTypeLabel || ""} onChange={e => set("newTypeLabel", e.target.value)} style={{ background: "white", marginBottom: 8 }} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { set("showAddType", false); set("newTypeLabel", ""); }}>Annuler</button>
+                    <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
+                      const label = (form.newTypeLabel || "").trim();
+                      if (!label) return setFormError("Entrez un nom de type");
+                      const res = await addLodgingType(label);
+                      if (res && !res.ok) return setFormError(res.error);
+                      set("showAddType", false);
+                      set("newTypeLabel", "");
+                      setFormError("");
+                    }}>✓ Ajouter</button>
+                  </div>
+                </div>
+              )}
               <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Titre *</label>
                 <input className="input" placeholder="Ex : Audi A3, Loft moderne…" value={form.title || ""} onChange={e => set("title", e.target.value)} />
               </div>
@@ -2829,6 +2940,14 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 <>
                   <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{form.type === "moto" ? "Places (1 ou 2) *" : "Places *"}</label>
                     <input className="input" type="number" placeholder={form.type === "moto" ? "2" : "5"} value={form.seats || ""} onChange={e => set("seats", parseInt(e.target.value) || 0)} /></div>
+                  {form.type === "car" && (
+                    <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>🚙 Type de véhicule *</label>
+                      <select className="input" value={form.vehicleType || ""} onChange={e => set("vehicleType", e.target.value)}>
+                        <option value="">— Choisir —</option>
+                        {VEHICLE_BODY_TYPES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+                      </select>
+                    </div>
+                  )}
                   <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>⛽ Carburant *</label>
                     <select className="input" value={form.fuel || ""} onChange={e => set("fuel", e.target.value)}>
                       <option value="">— Choisir —</option>
@@ -2875,7 +2994,8 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   if (!form.price || form.price <= 0) return setFormError("Le prix doit être supérieur à 0");
                   const finalCityEdit = form.city === "__other__" ? (form.customCity || "").trim() : form.city;
                   if (form.city === "__other__" && finalCityEdit) addCustomCity(form.country, finalCityEdit);
-                  const finalDataEdit = { ...form, city: finalCityEdit || form.city, photos: photos.length > 0 ? photos : [PROPERTY_TYPES[form.type]?.icon || "🏠"] };
+                  const { showAddType: _s, newTypeLabel: _n, ...cleanFormEdit } = form;
+                  const finalDataEdit = { ...cleanFormEdit, city: finalCityEdit || form.city, photos: photos.length > 0 ? photos : [getTypeInfo(form.type)?.icon || "🏠"] };
                   updateListing(modal.data, finalDataEdit);
                   return;
                 }
@@ -2889,11 +3009,13 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 if (!form.desc || !form.desc.trim()) return setFormError("Description obligatoire");
                 if (isLodging(form.type) && (!form.rooms || !form.guests)) return setFormError("Chambres et personnes obligatoires");
                 if (isVehicle(form.type) && !form.seats) return setFormError("Places obligatoires");
+                if (form.type === "car" && !form.vehicleType) return setFormError("Type de véhicule obligatoire");
                 if (isVehicle(form.type) && !form.fuel) return setFormError("Type de carburant obligatoire");
                 if (isVehicle(form.type) && !form.transmission) return setFormError("Type de transmission obligatoire");
                 const finalCity = form.city === "__other__" ? form.customCity.trim() : form.city;
                 if (form.city === "__other__") addCustomCity(form.country, finalCity);
-                const finalData = { ...form, city: finalCity, photos: photos.length > 0 ? photos : [PROPERTY_TYPES[form.type]?.icon || "🏠"] };
+                const { showAddType, newTypeLabel, ...cleanForm } = form;
+                const finalData = { ...cleanForm, city: finalCity, photos: photos.length > 0 ? photos : [getTypeInfo(form.type)?.icon || "🏠"] };
                 addListing(finalData);
               }}>{modal.type === "edit" ? "✓ Enregistrer les modifications" : "✓ Soumettre"}</button>
             </div>
@@ -2926,7 +3048,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
 
               {/* Récap réservation */}
               <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 18 }}>
-                <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{PROPERTY_TYPES[listing.type]?.icon} {listing.title}</p>
+                <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{getTypeInfo(listing.type)?.icon} {listing.title}</p>
                 <p style={{ fontSize: 12, color: "#6b7280" }}>📍 {listing.city}, {listing.country}</p>
                 <p style={{ fontSize: 12, color: "#6b7280" }}>📅 Du {from} au {to} ({days} jour{days > 1 ? "s" : ""})</p>
                 <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
@@ -2942,6 +3064,14 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   <input className="input" type="email" placeholder="votre@email.com" value={form.bookingEmail || ""} onChange={e => set("bookingEmail", e.target.value)} /></div>
                 <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📱 Téléphone *</label>
                   <input className="input" type="tel" placeholder="+33 6 12 34 56 78" value={form.phone || ""} onChange={e => set("phone", e.target.value)} /></div>
+                {isLodging(listing.type) && (
+                  <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>👥 Nombre de personnes * {listing.guests ? `(max ${listing.guests})` : ""}</label>
+                    <input className="input" type="number" min={1} max={listing.guests || undefined} placeholder="2" value={form.guestsCount || ""} onChange={e => set("guestsCount", parseInt(e.target.value) || "")} />
+                    {listing.guests > 0 && form.guestsCount > listing.guests && (
+                      <p style={{ fontSize: 12, color: "#991b1b", marginTop: 6, fontWeight: 600 }}>⚠️ Ce logement accueille au maximum {listing.guests} personnes.</p>
+                    )}
+                  </div>
+                )}
                 <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>🆔 Pièce d'identité *</label>
                   <select className="input" value={form.idType || ""} onChange={e => set("idType", e.target.value)}>
                     <option value="">— Choisir —</option>
@@ -2963,10 +3093,14 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                     if (!form.fullName || !form.fullName.trim()) return setFormError("Nom obligatoire");
                     if (!form.bookingEmail || !form.bookingEmail.trim()) return setFormError("Email obligatoire");
                     if (!form.phone || !form.phone.trim()) return setFormError("Téléphone obligatoire");
+                    if (isLodging(listing.type)) {
+                      if (!form.guestsCount || form.guestsCount < 1) return setFormError("Nombre de personnes obligatoire");
+                      if (listing.guests > 0 && form.guestsCount > listing.guests) return setFormError(`Ce logement accueille au maximum ${listing.guests} personnes`);
+                    }
                     if (!form.idType) return setFormError("Type de pièce d'identité obligatoire");
                     if (!form.idNumber || !form.idNumber.trim()) return setFormError("Numéro de pièce obligatoire");
                     setFormError("");
-                    setModal({ type: "bookingPayment", data: { listing, from, to, info: { fullName: form.fullName, email: form.bookingEmail, phone: form.phone, idType: form.idType, idNumber: form.idNumber, note: form.bookingNote || "" } } });
+                    setModal({ type: "bookingPayment", data: { listing, from, to, info: { fullName: form.fullName, email: form.bookingEmail, phone: form.phone, guestsCount: isLodging(listing.type) ? form.guestsCount : null, idType: form.idType, idNumber: form.idNumber, note: form.bookingNote || "" } } });
                   }}>Continuer →</button>
                 </div>
               </div>
@@ -2996,10 +3130,10 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
 
               {/* Récap complet */}
               <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-                <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{PROPERTY_TYPES[listing.type]?.icon} {listing.title}</p>
+                <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{getTypeInfo(listing.type)?.icon} {listing.title}</p>
                 <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>📍 {listing.city}, {listing.country}</p>
                 <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>📅 Du {from} au {to}</p>
-                <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>👤 {info.fullName} · 📱 {info.phone}</p>
+                <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>👤 {info.fullName} · 📱 {info.phone}{info.guestsCount ? ` · 👥 ${info.guestsCount} pers` : ""}</p>
                 <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 10, paddingTop: 10 }}>
                   {priceInfo.offerApplied ? (
                     <>
@@ -3398,7 +3532,7 @@ function BookingCalendar({ listing, user, book, setModal }) {
 
   return (
     <>
-      <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 4 }}>{PROPERTY_TYPES[listing.type] && PROPERTY_TYPES[listing.type].icon || "🏠"} {listing.title}</h2>
+      <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 4 }}>{getTypeInfo(listing.type) && getTypeInfo(listing.type).icon || "🏠"} {listing.title}</h2>
       <p style={{ color: "#6b7280", marginBottom: 12, fontSize: 13 }}>📍 {listing.city}, {listing.country} · <strong>{listing.price}€/jour</strong></p>
       <p style={{ background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 10, padding: 10, fontSize: 12, color: "#0f766e", marginBottom: 16 }}>👤 Par <strong>{listing.ownerName}</strong></p>
 
