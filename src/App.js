@@ -3440,10 +3440,11 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
               {/* Mes infos de versement */}
               <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 16 }}>
                 <h3 style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>📋 Mes coordonnées</h3>
-                <p style={{ fontSize: 13, marginBottom: 4 }}>👤 {user.firstName || ""} {user.lastName || user.name}</p>
+                <p style={{ fontSize: 13, marginBottom: 4 }}>👤 {user.paymentInfo?.fullName || user.name}</p>
                 <p style={{ fontSize: 13, marginBottom: 4 }}>📧 {user.email}</p>
-                {user.rib && <p style={{ fontSize: 13, marginBottom: 4 }}>🏦 RIB : {user.rib}</p>}
-                {!user.rib && <p style={{ fontSize: 12, color: "#92400e" }}>⚠️ Ajoutez votre RIB pour recevoir vos versements (page Profil)</p>}
+                {user.paymentInfo?.rib && <p style={{ fontSize: 13, marginBottom: 4 }}>🏦 RIB : {user.paymentInfo.rib}</p>}
+                {user.paymentInfo?.wafacash && <p style={{ fontSize: 13, marginBottom: 4 }}>💵 Wafacash : {user.paymentInfo.wafacash}</p>}
+                {!user.paymentInfo?.rib && !user.paymentInfo?.wafacash && <p style={{ fontSize: 12, color: "#92400e" }}>⚠️ Ajoutez vos infos de paiement pour recevoir vos versements (page Profil)</p>}
               </div>
 
               {/* Historique des transactions */}
