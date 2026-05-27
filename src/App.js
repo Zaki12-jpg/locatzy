@@ -3449,11 +3449,23 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
           const myBookingsAsOwner = (bookings || []).filter(b => b.ownerId === user.id && b.renterConfirmed);
           const balance = calculateOwnerBalance(user.id, bookings, payouts);
           const isPositive = balance >= 0;
-          // Total des commissions dues pour paiements sur place
-          const owedCommission = myBookingsAsOwner.filter(b => b.paymentMethod !== "card").reduce((s, b) => s + (b.commission || 0), 0);
-          // Total gains carte non encore versés
-          const pendingCardGains = myBookingsAsOwner.filter(b => b.paymentMethod === "card" && !(payouts || []).find(p => p.bookingId === b.id && p.status === "paid")).reduce((s, b) => s + (b.ownerEarnings || 0), 0);
-          // Total déjà versé
+
+          // 📅 Date du DERNIER retrait payé (pour solder l'historique antérieur)
+          const myPaidPayouts = (payouts || []).filter(p => p.ownerId === user.id && p.status === "paid" && p.paidAt);
+          const lastPaidAt = myPaidPayouts.length > 0
+            ? Math.max(...myPaidPayouts.map(p => new Date(p.paidAt).getTime()))
+            : 0;
+          // Garder seulement les réservations CONFIRMÉES APRÈS le dernier retrait payé
+          const recentBookings = myBookingsAsOwner.filter(b => {
+            const bookingDate = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+            return bookingDate > lastPaidAt;
+          });
+
+          // Commissions sur place dues (post-dernier-retrait uniquement)
+          const owedCommission = recentBookings.filter(b => b.paymentMethod !== "card").reduce((s, b) => s + (b.commission || 0), 0);
+          // Gains carte en attente (post-dernier-retrait, non liés à un payout payé)
+          const pendingCardGains = recentBookings.filter(b => b.paymentMethod === "card" && !(payouts || []).find(p => p.bookingId === b.id && p.status === "paid")).reduce((s, b) => s + (b.ownerEarnings || 0), 0);
+          // Total déjà versé (TOUS les retraits payés, inchangé)
           const alreadyPaid = (payouts || []).filter(p => p.ownerId === user.id && p.status === "paid").reduce((s, p) => s + (p.amount || 0), 0);
           return (
             <>
@@ -3497,14 +3509,22 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
               <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
                 {myBookingsAsOwner.length === 0 ? (
                   <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 20 }}>Aucune transaction pour l'instant</p>
-                ) : myBookingsAsOwner.map(b => {
+                ) : [...myBookingsAsOwner].sort((a, b) => {
+                  const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
+                  const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+                  return dateB - dateA; // récent en haut
+                }).map(b => {
                   const isCard = b.paymentMethod === "card";
                   const paidPayout = (payouts || []).find(p => p.bookingId === b.id && p.status === "paid");
+                  const bookingTime = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+                  const isSettled = bookingTime <= lastPaidAt; // soldé par un retrait précédent
                   return (
-                    <div key={b.id} style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, fontSize: 12 }}>
+                    <div key={b.id} style={{ background: isSettled ? "#f9fafb" : "white", border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, fontSize: 12, opacity: isSettled ? 0.6 : 1 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                         <strong>{b.listingTitle}</strong>
-                        <span style={{ color: isCard ? "#0d9488" : "#92400e", fontWeight: 700 }}>{isCard ? (paidPayout ? `✅ +${b.ownerEarnings}€ versé` : `+${b.ownerEarnings}€`) : `-${b.commission}€`}</span>
+                        <span style={{ color: isSettled ? "#9ca3af" : (isCard ? "#0d9488" : "#92400e"), fontWeight: 700 }}>
+                          {isSettled ? "✓ soldé" : (isCard ? (paidPayout ? `✅ +${b.ownerEarnings}€ versé` : `+${b.ownerEarnings}€`) : `-${b.commission}€`)}
+                        </span>
                       </div>
                       <p style={{ color: "#6b7280" }}>{b.from} → {b.to} · {isCard ? "💳 Carte" : "💵 Sur place"}</p>
                     </div>
