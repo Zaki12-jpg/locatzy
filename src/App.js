@@ -1094,14 +1094,19 @@ export default function App() {
   };
   const handleSwipeEnd = (e) => {
     if (modal) return; // pas de swipe quand une fenêtre est ouverte
-    const idx = swipePages.indexOf(page);
-    if (idx === -1) return; // page non concernée (ex : détail d'annonce)
     const t = e.changedTouches[0];
     const dx = t.clientX - swipeStart.current.x;
     const dy = t.clientY - swipeStart.current.y;
     // Le geste doit être assez horizontal (pour ne pas confondre avec un scroll vertical)
     // et assez long (au moins 60px) pour compter comme un vrai swipe.
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const idx = swipePages.indexOf(page);
+    if (idx === -1) {
+      // Page hors barre du bas (détail d'annonce, profil proprio, favoris…)
+      // → un balayage vers la droite revient à la page précédente.
+      if (dx > 0) goBack();
+      return;
+    }
     if (dx < 0 && idx < swipePages.length - 1) {
       // balayage vers la gauche → page suivante
       const next = swipePages[idx + 1];
@@ -1203,9 +1208,6 @@ export default function App() {
       {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
-        {pageHistory.length > 0 && (
-          <button onClick={goBack} title="Précédent" style={{ background: darkMode ? "#1a1a1a" : "#f3f4f6", borderRadius: "50%", width: 38, height: 38, fontSize: 20, fontWeight: 700, color: darkMode ? "#f5f5f5" : "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 8, flexShrink: 0, cursor: "pointer" }}>←</button>
-        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
           <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 16 }}>L</div>
           <div>
@@ -1787,13 +1789,13 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
     <div className="card" onClick={onOpen} style={{ cursor: "pointer" }}>
       <div
         style={{ height: 200, position: "relative", background: getTypeInfo(l.type)?.bgGradient || "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}
-        onTouchStart={(e) => { e.currentTarget.dataset.touchx = e.touches[0].clientX; }}
+        onTouchStart={(e) => { if (l.photos.length > 1) e.stopPropagation(); e.currentTarget.dataset.touchx = e.touches[0].clientX; }}
         onTouchEnd={(e) => {
           if (l.photos.length <= 1) return;
+          e.stopPropagation();
           const startX = parseFloat(e.currentTarget.dataset.touchx || "0");
           const diff = e.changedTouches[0].clientX - startX;
           if (Math.abs(diff) > 40) {
-            e.stopPropagation();
             if (diff < 0) setIdx((idx + 1) % l.photos.length); // glisse gauche → suivant
             else setIdx((idx - 1 + l.photos.length) % l.photos.length); // glisse droite → précédent
           }
@@ -1907,12 +1909,12 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
           className="detail-main-photo"
           style={{ background: getTypeInfo(l.type)?.bgGradient || "#f3f4f6", height: 460, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", borderRadius: 20, overflow: "hidden" }}
           onClick={() => setShowAllPhotos(true)}
-          onTouchStart={(e) => { e.currentTarget.dataset.touchx = e.touches[0].clientX; }}
+          onTouchStart={(e) => { e.stopPropagation(); e.currentTarget.dataset.touchx = e.touches[0].clientX; }}
           onTouchEnd={(e) => {
+            e.stopPropagation();
             const startX = parseFloat(e.currentTarget.dataset.touchx || "0");
             const diff = e.changedTouches[0].clientX - startX;
             if (Math.abs(diff) > 40) {
-              e.stopPropagation();
               if (diff < 0) setPhotoIdx((photoIdx + 1) % l.photos.length); // glisse gauche → suivant
               else setPhotoIdx((photoIdx - 1 + l.photos.length) % l.photos.length); // glisse droite → précédent
             }
