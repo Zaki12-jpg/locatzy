@@ -243,6 +243,13 @@ function calculateOwnerBalance(ownerId, bookings, payouts) {
       balance -= b.commission;
     }
   });
+  // 💸 Soustraire les retraits (demandés OU payés) sur le solde global
+  // (un retrait pending mobilise déjà le solde, on évite qu'il demande 2x)
+  (payouts || []).forEach(p => {
+    if (p.ownerId === ownerId && p.type === "withdrawal") {
+      balance -= (p.amount || 0);
+    }
+  });
   return Math.round(balance * 100) / 100; // arrondi 2 décimales
 }
 
@@ -1120,6 +1127,53 @@ export default function App() {
     }
   };
 
+  // 💸 NOUVEAU : Demander un retrait par montant (utilise le solde global)
+  const requestWithdrawal = async (amount) => {
+    // 1) Vérifier les infos de paiement
+    if (!user.paymentInfo || (!user.paymentInfo.rib && !user.paymentInfo.wafacash)) {
+      flash("Renseignez d'abord vos infos de paiement dans votre profil", "#ef4444");
+      setPage("profile");
+      return { ok: false };
+    }
+    // 2) Calculer le solde disponible
+    const balance = calculateOwnerBalance(user.id, bookings, payouts);
+    if (balance <= 0) {
+      flash("Votre solde est nul ou négatif, rien à retirer", "#ef4444");
+      return { ok: false };
+    }
+    const requested = parseFloat(amount);
+    if (isNaN(requested) || requested <= 0) {
+      flash("Montant invalide", "#ef4444");
+      return { ok: false };
+    }
+    if (requested > balance) {
+      flash(`Vous ne pouvez pas retirer plus que votre solde (${balance}€)`, "#ef4444");
+      return { ok: false };
+    }
+    // 3) Créer la demande de retrait dans Firebase
+    try {
+      await addDoc(collection(db, "payouts"), {
+        id: Date.now(),
+        type: "withdrawal", // nouvelle catégorie : retrait sur solde global
+        ownerId: user.id,
+        ownerName: user.name,
+        ownerEmail: user.email,
+        amount: Math.round(requested * 100) / 100,
+        paymentInfo: user.paymentInfo,
+        status: "pending",
+        requestedAt: new Date().toISOString(),
+      });
+      addNotif(getAdminId(), `💸 ${user.name} demande un retrait de ${requested}€`, "payout");
+      sendEmail("blackberrywalid72@gmail.com", `Demande de retrait ${requested}€`, `${user.name} demande un retrait de ${requested}€ sur son solde Locatzy.`);
+      flash(`✅ Demande de retrait de ${requested}€ envoyée !`);
+      return { ok: true };
+    } catch (e) {
+      console.log("Erreur requestWithdrawal:", e);
+      flash("Erreur, réessayez", "#ef4444");
+      return { ok: false };
+    }
+  };
+
   
   const handleToggleFavorite = async (listingId) => {
     if (!user) return setModal({ type: "login" });
@@ -1284,7 +1338,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -2905,7 +2959,7 @@ function SearchableSelect({ options, value, onChange, placeholder = "— Choisir
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -3467,7 +3521,90 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 })}
               </div>
 
-              <button className="btn btn-ghost" style={{ width: "100%", marginTop: 16 }} onClick={() => setModal(null)}>Fermer</button>
+              {/* 💸 BOUTON RETIRER MON ARGENT */}
+              {balance > 0 && (
+                <button onClick={() => setModal({ type: "withdrawForm", data: { maxAmount: balance } })} style={{ width: "100%", marginTop: 16, padding: 14, borderRadius: 12, background: "linear-gradient(135deg,#0d9488,#14b8a6)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer", border: "none", boxShadow: "0 4px 12px rgba(13,148,136,0.3)" }}>
+                  💸 Retirer mon argent ({balance}€ disponible)
+                </button>
+              )}
+              {balance <= 0 && (
+                <div style={{ marginTop: 16, padding: 12, background: "#f3f4f6", borderRadius: 12, textAlign: "center", color: "#6b7280", fontSize: 13 }}>
+                  💸 Aucun montant disponible au retrait pour le moment
+                </div>
+              )}
+
+              <button className="btn btn-ghost" style={{ width: "100%", marginTop: 10 }} onClick={() => setModal(null)}>Fermer</button>
+            </>
+          );
+        })()}
+
+        {/* 💸 DEMANDE DE RETRAIT */}
+        {modal.type === "withdrawForm" && (() => {
+          const maxAmount = modal.data?.maxAmount || 0;
+          const customAmount = form.withdrawAmount;
+          return (
+            <>
+              <h2 className="display" style={{ fontSize: 22, marginBottom: 6 }}>💸 Retirer mon argent</h2>
+              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 16 }}>Solde disponible : <strong style={{ color: "#0d9488" }}>{maxAmount}€</strong></p>
+
+              {/* Récap infos paiement */}
+              <div style={{ background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 12, padding: 12, marginBottom: 16 }}>
+                <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Le virement sera envoyé sur :</p>
+                {user.paymentInfo?.rib && <p style={{ fontSize: 13, fontWeight: 600 }}>🏦 RIB : {user.paymentInfo.rib}</p>}
+                {user.paymentInfo?.wafacash && <p style={{ fontSize: 13, fontWeight: 600 }}>💵 Wafacash : {user.paymentInfo.wafacash}</p>}
+                <p style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>👤 {user.paymentInfo?.fullName}</p>
+              </div>
+
+              {/* Bouton TOUT RETIRER */}
+              <button onClick={async () => {
+                const res = await requestWithdrawal(maxAmount);
+                if (res?.ok) setModal(null);
+              }} style={{ width: "100%", padding: 16, borderRadius: 12, background: "linear-gradient(135deg,#0d9488,#14b8a6)", color: "white", fontWeight: 700, fontSize: 16, marginBottom: 12, cursor: "pointer", border: "none", boxShadow: "0 4px 12px rgba(13,148,136,0.3)" }}>
+                💰 Tout retirer ({maxAmount}€)
+              </button>
+
+              {/* Séparateur */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0", color: "#9ca3af", fontSize: 12 }}>
+                <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+                OU
+                <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+              </div>
+
+              {/* Champ MONTANT PERSONNALISÉ */}
+              <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>✏️ Choisir un montant (€)</label>
+              <input
+                className="input"
+                type="number"
+                placeholder={`Maximum ${maxAmount}€`}
+                value={customAmount || ""}
+                onChange={e => set("withdrawAmount", e.target.value)}
+                min={1}
+                max={maxAmount}
+                step="0.01"
+                style={{ marginBottom: 6 }}
+              />
+              {customAmount && parseFloat(customAmount) > maxAmount && (
+                <p style={{ fontSize: 12, color: "#991b1b", marginBottom: 8, fontWeight: 600 }}>⚠️ Le montant dépasse votre solde disponible</p>
+              )}
+              <button onClick={async () => {
+                if (!customAmount || parseFloat(customAmount) <= 0) {
+                  setFormError("Entrez un montant valide");
+                  return;
+                }
+                if (parseFloat(customAmount) > maxAmount) {
+                  setFormError(`Maximum ${maxAmount}€`);
+                  return;
+                }
+                setFormError("");
+                const res = await requestWithdrawal(customAmount);
+                if (res?.ok) { set("withdrawAmount", ""); setModal(null); }
+              }} style={{ width: "100%", padding: 14, borderRadius: 12, background: "white", color: "#0d9488", fontWeight: 700, fontSize: 14, marginBottom: 12, cursor: "pointer", border: "2px solid #14b8a6" }}>
+                💸 Demander ce montant
+              </button>
+
+              {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600, marginBottom: 10 }}>⚠️ {formError}</div>}
+
+              <button className="btn btn-ghost" style={{ width: "100%" }} onClick={() => { set("withdrawAmount", ""); setFormError(""); setModal({ type: "balanceDetail" }); }}>Annuler</button>
             </>
           );
         })()}
