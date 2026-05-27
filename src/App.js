@@ -2609,6 +2609,68 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
   );
 }
 
+// ─── MENU DÉROULANT CHERCHABLE (taper pour filtrer) ──────────────────
+// options : tableau de chaînes (ex : ["🇲🇦 Maroc", "🇫🇷 France"])
+// value : valeur sélectionnée · onChange : appelée avec la valeur choisie
+function SearchableSelect({ options, value, onChange, placeholder = "— Choisir —", disabled = false, extraOption = null }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  // On filtre les options selon ce que l'utilisateur tape (insensible à la casse et aux accents)
+  const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const filtered = (options || []).filter(o => norm(o).includes(norm(query)));
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="input"
+        disabled={disabled}
+        onClick={() => { if (!disabled) { setOpen(o => !o); setQuery(""); } }}
+        style={{ width: "100%", textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: disabled ? "not-allowed" : "pointer", background: disabled ? "#f3f4f6" : "white", color: value ? "#1a1a1a" : "#9ca3af" }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value || placeholder}</span>
+        <span style={{ color: "#9ca3af", marginLeft: 8 }}>▾</span>
+      </button>
+      {open && !disabled && (
+        <>
+          {/* fond cliquable pour fermer */}
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+          <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "white", border: "1.5px solid #e5e7eb", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.15)", zIndex: 91, overflow: "hidden" }}>
+            <div style={{ padding: 8, borderBottom: "1px solid #f3f4f6" }}>
+              <input
+                autoFocus
+                className="input"
+                placeholder="🔍 Tapez pour chercher…"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                style={{ fontSize: 14 }}
+              />
+            </div>
+            <div style={{ maxHeight: "40vh", overflowY: "auto" }}>
+              {extraOption && (
+                <button type="button" onClick={() => { onChange(extraOption.value); setOpen(false); }} style={{ width: "100%", padding: "12px 16px", textAlign: "left", background: "white", color: "#6d28d9", fontWeight: 600, fontSize: 14, borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}>
+                  {extraOption.label}
+                </button>
+              )}
+              {filtered.length === 0 ? (
+                <div style={{ padding: 16, color: "#9ca3af", fontSize: 14, textAlign: "center" }}>Aucun résultat</div>
+              ) : filtered.map(o => (
+                <button
+                  key={o}
+                  type="button"
+                  onClick={() => { onChange(o); setOpen(false); }}
+                  style={{ width: "100%", padding: "12px 16px", textAlign: "left", background: o === value ? "#f0fdfa" : "white", color: o === value ? "#0d9488" : "#1a1a1a", fontWeight: o === value ? 700 : 500, fontSize: 14, borderBottom: "1px solid #f9fafb", cursor: "pointer" }}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
@@ -2765,10 +2827,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <input className="input" placeholder="Nom complet" value={form.name || ""} onChange={e => set("name", e.target.value)} />
               <input className="input" placeholder="📧 Email" type="email" value={form.email || ""} onChange={e => set("email", e.target.value)} />
-              <select className="input" value={form.country || ""} onChange={e => set("country", e.target.value)}>
-                <option value="">— Choisir votre pays —</option>
-                {Object.keys(COUNTRIES).sort().map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <SearchableSelect options={Object.keys(COUNTRIES).sort()} value={form.country || ""} onChange={v => set("country", v)} placeholder="— Choisir votre pays —" />
               <input className="input" placeholder="🔒 Mot de passe" type="password" value={form.password || ""} onChange={e => set("password", e.target.value)} />
               <input className="input" placeholder="🔒 Confirmer le mot de passe" type="password" value={form.confirmPassword || ""} onChange={e => set("confirmPassword", e.target.value)} />
               {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
@@ -2865,16 +2924,17 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
                 <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Pays *</label>
-                  <select className="input" value={form.country || ""} onChange={e => { set("country", e.target.value); set("city", ""); set("customCity", ""); }}>
-                    <option value="">— Choisir —</option>{Object.keys(COUNTRIES).sort().map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <SearchableSelect options={Object.keys(COUNTRIES).sort()} value={form.country || ""} onChange={v => { set("country", v); set("city", ""); set("customCity", ""); }} placeholder="— Choisir —" />
                 </div>
                 <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Ville *</label>
-                  <select className="input" value={form.city || ""} onChange={e => set("city", e.target.value)} disabled={!form.country}>
-                    <option value="">{form.country ? "— Choisir —" : "Pays d'abord"}</option>
-                    {form.country && getCitiesForCountry(form.country).map(c => <option key={c} value={c}>{c}</option>)}
-                    {form.country && <option value="__other__">✏️ Ma ville n'est pas listée</option>}
-                  </select>
+                  <SearchableSelect
+                    options={form.country ? getCitiesForCountry(form.country) : []}
+                    value={form.city === "__other__" ? "✏️ Ma ville n'est pas listée" : (form.city || "")}
+                    onChange={v => set("city", v)}
+                    placeholder={form.country ? "— Choisir —" : "Pays d'abord"}
+                    disabled={!form.country}
+                    extraOption={form.country ? { value: "__other__", label: "✏️ Ma ville n'est pas listée" } : null}
+                  />
                 </div>
               </div>
               {form.city === "__other__" && (
