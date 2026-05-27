@@ -1234,7 +1234,7 @@ export default function App() {
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
-      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} setPage={setPage} />}
+      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} setPage={setPage} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} />}
@@ -2258,7 +2258,7 @@ function Stars({ value, size = 16, onChange = null }) {
 }
 
 // ─── MY PAGE ─────────────────────────────────────────────────────────
-function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal, reviews, user, confirmExchange, requestPayout, setPage }) {
+function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal, reviews, user, confirmExchange, requestPayout, payouts, setPage }) {
   const [tab, setTab] = useState("listings");
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
 
@@ -2360,13 +2360,30 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
               {/* 💰 Demander le versement : apparaît dès que le LOCATAIRE a confirmé avoir reçu */}
               {b.renterConfirmed && (
                 <div style={{ marginTop: 10 }}>
-                  {b.payoutRequested ? (
-                    <div style={{ textAlign: "center", padding: 10, background: "#fef3c7", borderRadius: 10, color: "#92400e", fontWeight: 700, fontSize: 13 }}>
-                      💸 Versement demandé — en cours de traitement
-                    </div>
-                  ) : (
-                    <button className="btn btn-primary" style={{ width: "100%", background: "linear-gradient(135deg,#f59e0b,#d97706)" }} onClick={() => requestPayout(b)}>💰 Demander le versement de mes gains ({b.ownerEarnings}€)</button>
-                  )}
+                  {(() => {
+                    // 🔍 Chercher si un versement a été demandé pour cette réservation et son statut
+                    const myPayout = (payouts || []).find(p => p.bookingId === b.id);
+                    if (myPayout && myPayout.status === "paid") {
+                      // ✅ Versement effectué par l'admin → afficher la date d'envoi
+                      const paidDate = myPayout.paidAt ? new Date(myPayout.paidAt).toLocaleDateString("fr-FR") : "";
+                      return (
+                        <div style={{ textAlign: "center", padding: 10, background: "#d1fae5", borderRadius: 10, color: "#065f46", fontWeight: 700, fontSize: 13 }}>
+                          ✅ Viré le {paidDate} — réception sous 1-3 jours
+                        </div>
+                      );
+                    }
+                    if (b.payoutRequested) {
+                      // ⏳ Demande en attente
+                      return (
+                        <div style={{ textAlign: "center", padding: 10, background: "#fef3c7", borderRadius: 10, color: "#92400e", fontWeight: 700, fontSize: 13 }}>
+                          💸 Versement demandé — en cours de traitement
+                        </div>
+                      );
+                    }
+                    return (
+                      <button className="btn btn-primary" style={{ width: "100%", background: "linear-gradient(135deg,#f59e0b,#d97706)" }} onClick={() => requestPayout(b)}>💰 Demander le versement de mes gains ({b.ownerEarnings}€)</button>
+                    );
+                  })()}
                 </div>
               )}
             </div>
