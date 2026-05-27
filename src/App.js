@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { db, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDocs } from "./firebase";
 
 // ════════════════════════════════════════════════════════════════════
@@ -1059,9 +1059,44 @@ export default function App() {
     }
   };
 
+  // 📱 SWIPE (balayage) entre les pages de la barre du bas, comme Instagram
+  // On construit la liste des pages visibles dans l'ordre de la barre du bas.
+  const swipePages = ["home"];
+  if (user) swipePages.push("my", "messages", "notif");
+  if (user?.role === "admin") swipePages.push("admin");
+  swipePages.push("profile");
+  // On ne permet le swipe que sur ces pages (pas sur le détail d'annonce, etc.)
+  const swipeStart = useRef({ x: 0, y: 0 });
+  const handleSwipeStart = (e) => {
+    const t = e.touches[0];
+    swipeStart.current = { x: t.clientX, y: t.clientY };
+  };
+  const handleSwipeEnd = (e) => {
+    if (modal) return; // pas de swipe quand une fenêtre est ouverte
+    const idx = swipePages.indexOf(page);
+    if (idx === -1) return; // page non concernée (ex : détail d'annonce)
+    const t = e.changedTouches[0];
+    const dx = t.clientX - swipeStart.current.x;
+    const dy = t.clientY - swipeStart.current.y;
+    // Le geste doit être assez horizontal (pour ne pas confondre avec un scroll vertical)
+    // et assez long (au moins 60px) pour compter comme un vrai swipe.
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0 && idx < swipePages.length - 1) {
+      // balayage vers la gauche → page suivante
+      const next = swipePages[idx + 1];
+      if (next === "notif") markAllRead();
+      setPage(next);
+    } else if (dx > 0 && idx > 0) {
+      // balayage vers la droite → page précédente
+      const prev = swipePages[idx - 1];
+      if (prev === "notif") markAllRead();
+      setPage(prev);
+    }
+  };
+
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", minHeight: "100vh", background: darkMode ? "#000" : "#e5e7eb", color: darkMode ? "#f5f5f5" : "#0a0a0a", display: "flex", justifyContent: "center" }}>
-      <div className="app-container" style={{ width: "100%", minHeight: "100vh", background: darkMode ? "#0f0f0f" : "#fafafa", position: "relative", boxShadow: "0 0 40px rgba(0,0,0,0.08)", paddingBottom: 80 }}>
+      <div className="app-container" onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd} style={{ width: "100%", minHeight: "100vh", background: darkMode ? "#0f0f0f" : "#fafafa", position: "relative", boxShadow: "0 0 40px rgba(0,0,0,0.08)", paddingBottom: 80 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fraunces:wght@600;800&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
