@@ -1367,7 +1367,7 @@ export default function App() {
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
-      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} setPage={setPage} />}
+      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} setPage={setPage} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} />}
@@ -2424,7 +2424,7 @@ function Stars({ value, size = 16, onChange = null }) {
 }
 
 // ─── MY PAGE ─────────────────────────────────────────────────────────
-function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal, reviews, user, confirmExchange, requestPayout, payouts, setPage }) {
+function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings, setModal, reviews, user, confirmExchange, requestPayout, payouts, setPage }) {
   const [tab, setTab] = useState("listings");
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
 
@@ -2446,6 +2446,34 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
         <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📋 Mes annonces</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{myListings.length}</div></div>
         <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📅 Réservations reçues</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{bookingsOnMyListings.length}</div></div>
         <div className="card" style={{ padding: 22, background: "linear-gradient(135deg,#14b8a6,#0d9488)", color: "white", border: "none" }}><div style={{ fontSize: 13, opacity: 0.9 }}>💰 Mes gains</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{totalEarnings.toFixed(2)}€</div></div>
+        {/* 💼 Mon solde (ce qui reste à recevoir / ce que tu dois) */}
+        {(() => {
+          const balance = calculateOwnerBalance(user.id, bookings, payouts);
+          const isPositive = balance >= 0;
+          const isDeactivated = user.accountStatus === "deactivated";
+          let daysLeft = null;
+          if (!isPositive && user.balanceWentNegativeAt) {
+            const elapsed = (Date.now() - new Date(user.balanceWentNegativeAt).getTime()) / 86400000;
+            daysLeft = Math.max(0, Math.ceil(7 - elapsed));
+          }
+          const bg = isDeactivated
+            ? "linear-gradient(135deg,#991b1b,#7f1d1d)"
+            : isPositive
+              ? "linear-gradient(135deg,#0d9488,#0f766e)"
+              : "linear-gradient(135deg,#dc2626,#991b1b)";
+          return (
+            <div onClick={() => setModal({ type: "balanceDetail" })} className="card" style={{ padding: 22, background: bg, color: "white", border: "none", cursor: "pointer" }}>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>{isDeactivated ? "🚫 Compte désactivé" : "💼 Mon solde"}</div>
+              <div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{isPositive ? "+" : ""}{balance}€</div>
+              {isDeactivated && (
+                <div style={{ marginTop: 8, fontSize: 11, opacity: 0.95 }}>⛔ Vos annonces ne sont plus visibles</div>
+              )}
+              {!isPositive && !isDeactivated && daysLeft !== null && (
+                <div style={{ marginTop: 8, fontSize: 11, opacity: 0.95 }}>⏰ Reste {daysLeft}j pour régler</div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {reviewable.length > 0 && (
@@ -2496,51 +2524,6 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
 
       {tab === "received" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* 💰 CARTE DU SOLDE + ALERTE COMPTE EN RETARD */}
-          {(() => {
-            const balance = calculateOwnerBalance(user.id, [...bookingsOnMyListings, ...myBookingsAsRenter], payouts);
-            const isPositive = balance >= 0;
-            const isDeactivated = user.accountStatus === "deactivated";
-            // 📅 Calcul du délai restant si solde négatif
-            let daysLeft = null;
-            if (!isPositive && user.balanceWentNegativeAt) {
-              const elapsed = (Date.now() - new Date(user.balanceWentNegativeAt).getTime()) / 86400000;
-              daysLeft = Math.max(0, Math.ceil(7 - elapsed));
-            }
-            const bg = isDeactivated
-              ? "linear-gradient(135deg,#991b1b,#7f1d1d)"
-              : isPositive
-                ? "linear-gradient(135deg,#0d9488,#14b8a6)"
-                : "linear-gradient(135deg,#dc2626,#ef4444)";
-            return (
-              <div style={{ background: bg, borderRadius: 16, padding: 18, color: "white", boxShadow: "0 6px 20px rgba(0,0,0,0.12)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <p style={{ fontSize: 12, opacity: 0.9, marginBottom: 4 }}>
-                      {isDeactivated ? "🚫 Compte désactivé" : isPositive ? "💰 Locatzy vous doit" : "⚠️ Vous devez à Locatzy"}
-                    </p>
-                    <p style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{isPositive ? "+" : ""}{balance}€</p>
-                  </div>
-                  <button onClick={() => setModal({ type: "balanceDetail" })} style={{ background: "rgba(255,255,255,0.25)", color: "white", borderRadius: 50, padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer", border: "none" }}>📊 Détails</button>
-                </div>
-                {isDeactivated && (
-                  <div style={{ marginTop: 10, padding: 10, background: "rgba(255,255,255,0.15)", borderRadius: 10 }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>⛔ Vos annonces ne sont plus visibles aux clients</p>
-                    <p style={{ fontSize: 11, opacity: 0.95 }}>Réglez votre solde pour réactiver votre compte (options de paiement bientôt disponibles).</p>
-                  </div>
-                )}
-                {!isPositive && !isDeactivated && daysLeft !== null && (
-                  <div style={{ marginTop: 10, padding: 10, background: "rgba(255,255,255,0.15)", borderRadius: 10 }}>
-                    <p style={{ fontSize: 12, fontWeight: 700 }}>⏰ Il vous reste {daysLeft} jour{daysLeft > 1 ? "s" : ""} pour régler</p>
-                    <p style={{ fontSize: 11, opacity: 0.95, marginTop: 4 }}>Au-delà, vos annonces ne seront plus visibles. Compensé automatiquement à votre prochain paiement carte.</p>
-                  </div>
-                )}
-                {!isPositive && !isDeactivated && daysLeft === null && (
-                  <p style={{ fontSize: 11, marginTop: 8, opacity: 0.95 }}>Compensé automatiquement à votre prochain paiement carte.</p>
-                )}
-              </div>
-            );
-          })()}
           {bookingsOnMyListings.length === 0 ? <Empty icon="📥" msg="Aucune réservation reçue" /> : bookingsOnMyListings.map(b => (
             <div key={b.id} className="card" style={{ padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
@@ -3471,7 +3454,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
 
               {/* Solde principal */}
               <div style={{ background: isPositive ? "linear-gradient(135deg,#0d9488,#14b8a6)" : "linear-gradient(135deg,#dc2626,#ef4444)", borderRadius: 16, padding: 18, color: "white", marginBottom: 16 }}>
-                <p style={{ fontSize: 12, opacity: 0.9, marginBottom: 4 }}>{isPositive ? "Locatzy vous doit" : "Vous devez à Locatzy"}</p>
+                <p style={{ fontSize: 12, opacity: 0.9, marginBottom: 4 }}>{isPositive ? "Mon solde" : "Vous devez à Locatzy"}</p>
                 <p style={{ fontSize: 32, fontWeight: 800 }}>{isPositive ? "+" : ""}{balance}€</p>
               </div>
 
