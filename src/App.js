@@ -3235,6 +3235,12 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
           const days = Math.max(1, Math.ceil((new Date(to) - new Date(from)) / 86400000));
           const priceInfo = getPriceWithOffer(listing, days);
           const total = priceInfo.total;
+          // 💵 Paiement sur place autorisé seulement si l'arrivée est aujourd'hui ou demain.
+          // On compare les jours sans tenir compte de l'heure.
+          const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+          const arrival0 = new Date(from); arrival0.setHours(0, 0, 0, 0);
+          const daysUntilArrival = Math.round((arrival0 - today0) / 86400000);
+          const onsiteAllowed = daysUntilArrival <= 1; // aujourd'hui (0) ou demain (1)
           return (
             <>
               {/* Indicateur d'étapes */}
@@ -3289,17 +3295,13 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 22 }}>💳</span><span><strong>Carte bancaire</strong><br /><span style={{ fontSize: 11, color: "#6b7280" }}>Visa, Mastercard</span></span></span>
                   {form.paymentMethod === "card" && <span style={{ color: "#14b8a6", fontSize: 20 }}>✓</span>}
                 </button>
-                <button onClick={() => set("paymentMethod", "paypal")} style={{ padding: 14, borderRadius: 12, border: form.paymentMethod === "paypal" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: form.paymentMethod === "paypal" ? "#f0fdfa" : "white", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left", cursor: "pointer" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 22 }}>🅿️</span><span><strong>PayPal</strong><br /><span style={{ fontSize: 11, color: "#6b7280" }}>Compte PayPal</span></span></span>
-                  {form.paymentMethod === "paypal" && <span style={{ color: "#14b8a6", fontSize: 20 }}>✓</span>}
-                </button>
-                <button onClick={() => set("paymentMethod", "onsite")} style={{ padding: 14, borderRadius: 12, border: form.paymentMethod === "onsite" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: form.paymentMethod === "onsite" ? "#f0fdfa" : "white", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left", cursor: "pointer" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 22 }}>💵</span><span><strong>Paiement sur place</strong><br /><span style={{ fontSize: 11, color: "#6b7280" }}>À l'arrivée</span></span></span>
-                  {form.paymentMethod === "onsite" && <span style={{ color: "#14b8a6", fontSize: 20 }}>✓</span>}
-                </button>
+                {onsiteAllowed && (
+                  <button onClick={() => set("paymentMethod", "onsite")} style={{ padding: 14, borderRadius: 12, border: form.paymentMethod === "onsite" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: form.paymentMethod === "onsite" ? "#f0fdfa" : "white", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left", cursor: "pointer" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 22 }}>💵</span><span><strong>Paiement sur place</strong><br /><span style={{ fontSize: 11, color: "#6b7280" }}>À l'arrivée · uniquement si arrivée aujourd'hui ou demain</span></span></span>
+                    {form.paymentMethod === "onsite" && <span style={{ color: "#14b8a6", fontSize: 20 }}>✓</span>}
+                  </button>
+                )}
               </div>
-
-              <p style={{ fontSize: 11, color: "#9ca3af", background: "#fffbeb", border: "1px solid #fde68a", padding: 10, borderRadius: 10, marginBottom: 12 }}>⚠️ Paiement en ligne (Stripe/PayPal) bientôt disponible. Pour l'instant, la réservation est confirmée sans paiement immédiat.</p>
 
               {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600, marginBottom: 10 }}>⚠️ {formError}</div>}
 
@@ -3307,12 +3309,13 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModal({ type: "bookingInfo", data: { listing, from, to } })}>← Retour</button>
                 <button className="btn btn-primary" style={{ flex: 2, background: "linear-gradient(135deg,#14b8a6,#0d9488)" }} onClick={async () => {
                   if (!form.paymentMethod) return setFormError("Choisissez une méthode de paiement");
+                  if (form.paymentMethod === "onsite" && !onsiteAllowed) return setFormError("Le paiement sur place n'est possible que si l'arrivée est aujourd'hui ou demain");
                   setFormError("");
                   if (form.paymentMethod === "card") {
                     // Paiement par carte → rediriger vers Stripe
                     await payerAvecStripe(listing, from, to, total, info);
                   } else {
-                    // PayPal ou paiement sur place → réservation directe
+                    // Paiement sur place → réservation directe
                     await book(listing, from, to, { ...info, paymentMethod: form.paymentMethod });
                   }
                 }}>✓ Confirmer & Payer {total}€</button>
