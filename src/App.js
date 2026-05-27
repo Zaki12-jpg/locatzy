@@ -2524,7 +2524,11 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
 
       {tab === "received" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {bookingsOnMyListings.length === 0 ? <Empty icon="📥" msg="Aucune réservation reçue" /> : bookingsOnMyListings.map(b => (
+          {bookingsOnMyListings.length === 0 ? <Empty icon="📥" msg="Aucune réservation reçue" /> : [...bookingsOnMyListings].sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+            return dateB - dateA; // plus récent en haut
+          }).map(b => (
             <div key={b.id} className="card" style={{ padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
                 <div>
@@ -2583,7 +2587,11 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
 
       {tab === "bookings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {myBookingsAsRenter.length === 0 ? <Empty icon="🎫" msg="Aucune réservation" /> : myBookingsAsRenter.map(b => (
+          {myBookingsAsRenter.length === 0 ? <Empty icon="🎫" msg="Aucune réservation" /> : [...myBookingsAsRenter].sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+            return dateB - dateA;
+          }).map(b => (
             <div key={b.id} className="card" style={{ padding: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <div>
