@@ -221,6 +221,31 @@ function getConversationId(listingId, userA, userB) {
   return `${listingId}_${Math.min(userA, userB)}_${Math.max(userA, userB)}`;
 }
 
+// 💰 Calcule le SOLDE d'un proprio (positif = Locatzy lui doit, négatif = il doit Locatzy)
+// Règles :
+// - Paiement carte CONFIRMÉ (renterConfirmed) → ajoute ses gains (montant - commission) au solde
+//   ↳ Quand admin marque le payout "paid" → le solde redescend (l'argent est versé)
+// - Paiement sur place CONFIRMÉ (renterConfirmed) → soustrait la commission au solde (il doit cette commission)
+function calculateOwnerBalance(ownerId, bookings, payouts) {
+  let balance = 0;
+  const ownerBookings = (bookings || []).filter(b => b.ownerId === ownerId && b.renterConfirmed);
+  ownerBookings.forEach(b => {
+    if (b.paymentMethod === "card") {
+      // Paiement carte → Locatzy a encaissé le total, doit reverser les gains au proprio
+      // Vérifier si le versement a déjà été payé
+      const paidPayout = (payouts || []).find(p => p.bookingId === b.id && p.status === "paid");
+      if (!paidPayout) {
+        balance += b.ownerEarnings; // Locatzy lui doit ses gains
+      }
+      // Si déjà payé → rien à ajouter (l'argent est déjà sorti)
+    } else {
+      // Paiement sur place → le proprio a encaissé le total, doit la commission à Locatzy
+      balance -= b.commission;
+    }
+  });
+  return Math.round(balance * 100) / 100; // arrondi 2 décimales
+}
+
 // 🎁 Calcul du prix avec offre (si applicable)
 function getPriceWithOffer(listing, days) {
   if (listing.offerMinDays && listing.offerPrice && days >= listing.offerMinDays) {
@@ -467,6 +492,49 @@ export default function App() {
     // Forcer un petit re-render pour que les composants relisent le cache
     setLodgingCacheVersion(v => v + 1);
   }, [customLodgingTypes]);
+
+  // 🔔 SURVEILLER LE SOLDE DES PROPRIOS : si un solde devient négatif, on date l'événement
+  // Si un solde repasse à ≥ 0, on efface la date.
+  // Cette date sert ensuite au délai de 7 jours et à la désactivation automatique.
+  useEffect(() => {
+    if (!user || user.role !== "admin") return; // Seul l'admin déclenche la mise à jour (1 source de vérité)
+    if (!users || users.length === 0 || !bookings) return;
+    users.forEach(async (u) => {
+      const balance = calculateOwnerBalance(u.id, bookings, payouts);
+      const alreadyMarked = !!u.balanceWentNegativeAt;
+      try {
+        if (balance < 0 && !alreadyMarked) {
+          // Le solde vient de devenir négatif → on enregistre la date
+          if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { balanceWentNegativeAt: new Date().toISOString() });
+        } else if (balance >= 0 && alreadyMarked) {
+          // Le solde est repassé à 0 ou positif → on efface la date et on réactive
+          if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { balanceWentNegativeAt: null, accountStatus: "active" });
+        }
+      } catch (e) { console.log("Erreur surveillance solde:", e); }
+    });
+  }, [users, bookings, payouts, user]);
+
+  // ⏰ VÉRIFIER LE DÉLAI DE 7 JOURS : désactive automatiquement les comptes en retard
+  // Tourne à l'ouverture de l'app et toutes les heures.
+  useEffect(() => {
+    if (!user || user.role !== "admin") return;
+    const checkDeadlines = () => {
+      if (!users) return;
+      users.forEach(async (u) => {
+        if (!u.balanceWentNegativeAt) return;
+        const daysSince = (Date.now() - new Date(u.balanceWentNegativeAt).getTime()) / 86400000;
+        if (daysSince >= 7 && u.accountStatus !== "deactivated") {
+          // Plus de 7 jours → désactiver
+          try {
+            if (u.fbId) await updateDoc(doc(db, "users", u.fbId), { accountStatus: "deactivated" });
+          } catch (e) { console.log("Erreur désactivation:", e); }
+        }
+      });
+    };
+    checkDeadlines();
+    const id = setInterval(checkDeadlines, 60 * 60 * 1000); // toutes les heures
+    return () => clearInterval(id);
+  }, [users, user]);
 
   // 💳 Détecter le retour de paiement Stripe et créer la réservation
   useEffect(() => {
@@ -873,6 +941,10 @@ export default function App() {
 
   const visible = listings.filter(l => {
     if (l.status !== "approved") return false;
+    // 🚫 Si le proprio est désactivé (solde négatif depuis +7j), cacher ses annonces aux clients
+    // (mais le proprio voit toujours les siennes dans "Mes annonces")
+    const owner = (users || []).find(u => u.id === l.ownerId);
+    if (owner && owner.accountStatus === "deactivated") return false;
     if (filter !== "all" && l.type !== filter) return false;
     if (country !== "all" && l.country !== country) return false;
     if (search && !l.title.toLowerCase().includes(search.toLowerCase()) && !l.city.toLowerCase().includes(search.toLowerCase()) && !l.country.toLowerCase().includes(search.toLowerCase())) return false;
@@ -1212,7 +1284,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -2370,6 +2442,51 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
 
       {tab === "received" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* 💰 CARTE DU SOLDE + ALERTE COMPTE EN RETARD */}
+          {(() => {
+            const balance = calculateOwnerBalance(user.id, [...bookingsOnMyListings, ...myBookingsAsRenter], payouts);
+            const isPositive = balance >= 0;
+            const isDeactivated = user.accountStatus === "deactivated";
+            // 📅 Calcul du délai restant si solde négatif
+            let daysLeft = null;
+            if (!isPositive && user.balanceWentNegativeAt) {
+              const elapsed = (Date.now() - new Date(user.balanceWentNegativeAt).getTime()) / 86400000;
+              daysLeft = Math.max(0, Math.ceil(7 - elapsed));
+            }
+            const bg = isDeactivated
+              ? "linear-gradient(135deg,#991b1b,#7f1d1d)"
+              : isPositive
+                ? "linear-gradient(135deg,#0d9488,#14b8a6)"
+                : "linear-gradient(135deg,#dc2626,#ef4444)";
+            return (
+              <div style={{ background: bg, borderRadius: 16, padding: 18, color: "white", boxShadow: "0 6px 20px rgba(0,0,0,0.12)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <p style={{ fontSize: 12, opacity: 0.9, marginBottom: 4 }}>
+                      {isDeactivated ? "🚫 Compte désactivé" : isPositive ? "💰 Locatzy vous doit" : "⚠️ Vous devez à Locatzy"}
+                    </p>
+                    <p style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{isPositive ? "+" : ""}{balance}€</p>
+                  </div>
+                  <button onClick={() => setModal({ type: "balanceDetail" })} style={{ background: "rgba(255,255,255,0.25)", color: "white", borderRadius: 50, padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer", border: "none" }}>📊 Détails</button>
+                </div>
+                {isDeactivated && (
+                  <div style={{ marginTop: 10, padding: 10, background: "rgba(255,255,255,0.15)", borderRadius: 10 }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>⛔ Vos annonces ne sont plus visibles aux clients</p>
+                    <p style={{ fontSize: 11, opacity: 0.95 }}>Réglez votre solde pour réactiver votre compte (options de paiement bientôt disponibles).</p>
+                  </div>
+                )}
+                {!isPositive && !isDeactivated && daysLeft !== null && (
+                  <div style={{ marginTop: 10, padding: 10, background: "rgba(255,255,255,0.15)", borderRadius: 10 }}>
+                    <p style={{ fontSize: 12, fontWeight: 700 }}>⏰ Il vous reste {daysLeft} jour{daysLeft > 1 ? "s" : ""} pour régler</p>
+                    <p style={{ fontSize: 11, opacity: 0.95, marginTop: 4 }}>Au-delà, vos annonces ne seront plus visibles. Compensé automatiquement à votre prochain paiement carte.</p>
+                  </div>
+                )}
+                {!isPositive && !isDeactivated && daysLeft === null && (
+                  <p style={{ fontSize: 11, marginTop: 8, opacity: 0.95 }}>Compensé automatiquement à votre prochain paiement carte.</p>
+                )}
+              </div>
+            );
+          })()}
           {bookingsOnMyListings.length === 0 ? <Empty icon="📥" msg="Aucune réservation reçue" /> : bookingsOnMyListings.map(b => (
             <div key={b.id} className="card" style={{ padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
@@ -2397,14 +2514,12 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
                   )}
                 </div>
               )}
-              {/* 💰 Demander le versement : apparaît dès que le LOCATAIRE a confirmé avoir reçu */}
+              {/* 💰 Indicateur du flux d'argent (selon mode de paiement) */}
               {b.renterConfirmed && (
                 <div style={{ marginTop: 10 }}>
-                  {(() => {
-                    // 🔍 Chercher si un versement a été demandé pour cette réservation et son statut
+                  {b.paymentMethod === "card" ? (() => {
                     const myPayout = (payouts || []).find(p => p.bookingId === b.id);
                     if (myPayout && myPayout.status === "paid") {
-                      // ✅ Versement effectué par l'admin → afficher la date d'envoi
                       const paidDate = myPayout.paidAt ? new Date(myPayout.paidAt).toLocaleDateString("fr-FR") : "";
                       return (
                         <div style={{ textAlign: "center", padding: 10, background: "#d1fae5", borderRadius: 10, color: "#065f46", fontWeight: 700, fontSize: 13 }}>
@@ -2412,18 +2527,16 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, setModal
                         </div>
                       );
                     }
-                    if (b.payoutRequested) {
-                      // ⏳ Demande en attente
-                      return (
-                        <div style={{ textAlign: "center", padding: 10, background: "#fef3c7", borderRadius: 10, color: "#92400e", fontWeight: 700, fontSize: 13 }}>
-                          💸 Versement demandé — en cours de traitement
-                        </div>
-                      );
-                    }
                     return (
-                      <button className="btn btn-primary" style={{ width: "100%", background: "linear-gradient(135deg,#f59e0b,#d97706)" }} onClick={() => requestPayout(b)}>💰 Demander le versement de mes gains ({b.ownerEarnings}€)</button>
+                      <div style={{ textAlign: "center", padding: 10, background: "#dbeafe", borderRadius: 10, color: "#1e40af", fontWeight: 700, fontSize: 13 }}>
+                        💳 Payé par carte · +{b.ownerEarnings}€ ajoutés à votre solde
+                      </div>
                     );
-                  })()}
+                  })() : (
+                    <div style={{ textAlign: "center", padding: 10, background: "#fef3c7", borderRadius: 10, color: "#92400e", fontWeight: 700, fontSize: 13 }}>
+                      💵 Payé sur place · vous devez {b.commission}€ de commission à Locatzy
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2792,7 +2905,7 @@ function SearchableSelect({ options, value, onChange, placeholder = "— Choisir
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -3282,6 +3395,78 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   }}>Continuer →</button>
                 </div>
               </div>
+            </>
+          );
+        })()}
+
+        {/* 💰 DÉTAILS DU SOLDE PROPRIO */}
+        {modal.type === "balanceDetail" && (() => {
+          const myBookingsAsOwner = (bookings || []).filter(b => b.ownerId === user.id && b.renterConfirmed);
+          const balance = calculateOwnerBalance(user.id, bookings, payouts);
+          const isPositive = balance >= 0;
+          // Total des commissions dues pour paiements sur place
+          const owedCommission = myBookingsAsOwner.filter(b => b.paymentMethod !== "card").reduce((s, b) => s + (b.commission || 0), 0);
+          // Total gains carte non encore versés
+          const pendingCardGains = myBookingsAsOwner.filter(b => b.paymentMethod === "card" && !(payouts || []).find(p => p.bookingId === b.id && p.status === "paid")).reduce((s, b) => s + (b.ownerEarnings || 0), 0);
+          // Total déjà versé
+          const alreadyPaid = (payouts || []).filter(p => p.ownerId === user.id && p.status === "paid").reduce((s, p) => s + (p.amount || 0), 0);
+          return (
+            <>
+              <h2 className="display" style={{ fontSize: 22, marginBottom: 6 }}>💰 Mon solde</h2>
+              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 16 }}>Détail de votre compte Locatzy</p>
+
+              {/* Solde principal */}
+              <div style={{ background: isPositive ? "linear-gradient(135deg,#0d9488,#14b8a6)" : "linear-gradient(135deg,#dc2626,#ef4444)", borderRadius: 16, padding: 18, color: "white", marginBottom: 16 }}>
+                <p style={{ fontSize: 12, opacity: 0.9, marginBottom: 4 }}>{isPositive ? "Locatzy vous doit" : "Vous devez à Locatzy"}</p>
+                <p style={{ fontSize: 32, fontWeight: 800 }}>{isPositive ? "+" : ""}{balance}€</p>
+              </div>
+
+              {/* Détails chiffrés */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                <div style={{ background: "#f0fdfa", borderRadius: 12, padding: 12 }}>
+                  <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>💳 Gains carte en attente</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#0d9488" }}>+{Math.round(pendingCardGains * 100) / 100}€</p>
+                </div>
+                <div style={{ background: "#fef3c7", borderRadius: 12, padding: 12 }}>
+                  <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>💵 Commission sur place due</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#92400e" }}>-{Math.round(owedCommission * 100) / 100}€</p>
+                </div>
+                <div style={{ background: "#dbeafe", borderRadius: 12, padding: 12, gridColumn: "1 / -1" }}>
+                  <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>✅ Déjà versé par Locatzy</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#1e40af" }}>{Math.round(alreadyPaid * 100) / 100}€</p>
+                </div>
+              </div>
+
+              {/* Mes infos de versement */}
+              <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+                <h3 style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>📋 Mes coordonnées</h3>
+                <p style={{ fontSize: 13, marginBottom: 4 }}>👤 {user.firstName || ""} {user.lastName || user.name}</p>
+                <p style={{ fontSize: 13, marginBottom: 4 }}>📧 {user.email}</p>
+                {user.rib && <p style={{ fontSize: 13, marginBottom: 4 }}>🏦 RIB : {user.rib}</p>}
+                {!user.rib && <p style={{ fontSize: 12, color: "#92400e" }}>⚠️ Ajoutez votre RIB pour recevoir vos versements (page Profil)</p>}
+              </div>
+
+              {/* Historique des transactions */}
+              <h3 style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>📜 Historique</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
+                {myBookingsAsOwner.length === 0 ? (
+                  <p style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 20 }}>Aucune transaction pour l'instant</p>
+                ) : myBookingsAsOwner.map(b => {
+                  const isCard = b.paymentMethod === "card";
+                  const paidPayout = (payouts || []).find(p => p.bookingId === b.id && p.status === "paid");
+                  return (
+                    <div key={b.id} style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, fontSize: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <strong>{b.listingTitle}</strong>
+                        <span style={{ color: isCard ? "#0d9488" : "#92400e", fontWeight: 700 }}>{isCard ? (paidPayout ? `✅ +${b.ownerEarnings}€ versé` : `+${b.ownerEarnings}€`) : `-${b.commission}€`}</span>
+                      </div>
+                      <p style={{ color: "#6b7280" }}>{b.from} → {b.to} · {isCard ? "💳 Carte" : "💵 Sur place"}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button className="btn btn-ghost" style={{ width: "100%", marginTop: 16 }} onClick={() => setModal(null)}>Fermer</button>
             </>
           );
         })()}
