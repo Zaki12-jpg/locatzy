@@ -324,6 +324,159 @@ const VEHICLE_BODY_LABELS = {
   "utilitaire": "🚐 Utilitaire",
 };
 
+// ✈️ AÉROPORTS PAR PAYS (liste de base — les proprios peuvent en ajouter dynamiquement)
+const AIRPORTS_BY_COUNTRY = {
+  "Maroc": [
+    "Casablanca - Mohammed V (CMN)",
+    "Marrakech - Menara (RAK)",
+    "Agadir - Al Massira (AGA)",
+    "Tanger - Ibn Battouta (TNG)",
+    "Fès - Saïs (FEZ)",
+    "Rabat - Salé (RBA)",
+    "Oujda - Angads (OUD)",
+    "Nador - Al Aroui (NDR)",
+    "Tétouan - Sania Ramel (TTU)",
+    "Al Hoceima - Cherif Al Idrissi (AHU)",
+    "Essaouira - Mogador (ESU)",
+    "Dakhla (VIL)",
+    "Laâyoune - Hassan I (EUN)",
+    "Ouarzazate (OZZ)",
+    "Errachidia - Moulay Ali Cherif (ERH)",
+    "Béni Mellal (BEM)",
+    "Zagora (OZG)",
+  ],
+  "France": [
+    "Paris - Charles de Gaulle (CDG)",
+    "Paris - Orly (ORY)",
+    "Paris - Beauvais (BVA)",
+    "Marseille - Provence (MRS)",
+    "Lyon - Saint-Exupéry (LYS)",
+    "Nice - Côte d'Azur (NCE)",
+    "Toulouse - Blagnac (TLS)",
+    "Bordeaux - Mérignac (BOD)",
+    "Nantes - Atlantique (NTE)",
+    "Strasbourg (SXB)",
+    "Lille - Lesquin (LIL)",
+    "Montpellier - Méditerranée (MPL)",
+    "Bâle-Mulhouse (MLH)",
+    "Rennes (RNS)",
+    "Brest (BES)",
+    "Biarritz (BIQ)",
+    "Ajaccio (AJA)",
+    "Bastia (BIA)",
+  ],
+  "Espagne": [
+    "Madrid - Barajas (MAD)",
+    "Barcelone - El Prat (BCN)",
+    "Palma de Majorque (PMI)",
+    "Malaga - Costa del Sol (AGP)",
+    "Alicante - Elche (ALC)",
+    "Séville (SVQ)",
+    "Valence (VLC)",
+    "Bilbao (BIO)",
+    "Ibiza (IBZ)",
+    "Tenerife Sud (TFS)",
+    "Las Palmas - Gran Canaria (LPA)",
+    "Lanzarote (ACE)",
+    "Fuerteventura (FUE)",
+  ],
+  "Italie": [
+    "Rome - Fiumicino (FCO)",
+    "Rome - Ciampino (CIA)",
+    "Milan - Malpensa (MXP)",
+    "Milan - Linate (LIN)",
+    "Milan - Bergame (BGY)",
+    "Venise - Marco Polo (VCE)",
+    "Naples (NAP)",
+    "Bologne (BLQ)",
+    "Florence (FLR)",
+    "Pise (PSA)",
+    "Catane (CTA)",
+    "Palerme (PMO)",
+    "Bari (BRI)",
+    "Turin (TRN)",
+  ],
+  "Belgique": [
+    "Bruxelles - Zaventem (BRU)",
+    "Charleroi - Bruxelles-Sud (CRL)",
+    "Liège (LGG)",
+    "Anvers (ANR)",
+  ],
+  "Allemagne": [
+    "Francfort (FRA)",
+    "Munich (MUC)",
+    "Berlin - Brandenburg (BER)",
+    "Düsseldorf (DUS)",
+    "Hambourg (HAM)",
+    "Cologne-Bonn (CGN)",
+    "Stuttgart (STR)",
+    "Hanovre (HAJ)",
+  ],
+  "Royaume-Uni": [
+    "Londres - Heathrow (LHR)",
+    "Londres - Gatwick (LGW)",
+    "Londres - Stansted (STN)",
+    "Londres - Luton (LTN)",
+    "Manchester (MAN)",
+    "Birmingham (BHX)",
+    "Édimbourg (EDI)",
+    "Glasgow (GLA)",
+    "Bristol (BRS)",
+    "Liverpool (LPL)",
+  ],
+  "Pays-Bas": [
+    "Amsterdam - Schiphol (AMS)",
+    "Rotterdam - La Haye (RTM)",
+    "Eindhoven (EIN)",
+  ],
+  "Portugal": [
+    "Lisbonne - Humberto Delgado (LIS)",
+    "Porto - Francisco Sá Carneiro (OPO)",
+    "Faro (FAO)",
+    "Funchal - Madère (FNC)",
+  ],
+  "Suisse": [
+    "Zurich (ZRH)",
+    "Genève (GVA)",
+    "Bâle-Mulhouse (BSL)",
+    "Berne (BRN)",
+  ],
+  "Tunisie": [
+    "Tunis - Carthage (TUN)",
+    "Djerba - Zarzis (DJE)",
+    "Monastir - Habib Bourguiba (MIR)",
+    "Enfidha - Hammamet (NBE)",
+    "Sfax (SFA)",
+    "Tabarka (TBJ)",
+  ],
+  "Algérie": [
+    "Alger - Houari Boumediene (ALG)",
+    "Oran - Es Sénia (ORN)",
+    "Constantine - Mohamed Boudiaf (CZL)",
+    "Annaba - Rabah Bitat (AAE)",
+    "Tlemcen - Zenata (TLM)",
+    "Béjaïa - Soummam (BJA)",
+    "Sétif (QSF)",
+    "Hassi Messaoud (HME)",
+  ],
+  "Égypte": [
+    "Le Caire (CAI)",
+    "Charm el-Cheikh (SSH)",
+    "Hurghada (HRG)",
+    "Louxor (LXR)",
+    "Alexandrie - Borg El Arab (HBE)",
+    "Marsa Alam (RMF)",
+  ],
+  "Sénégal": [
+    "Dakar - Blaise Diagne (DSS)",
+    "Saint-Louis (XLS)",
+    "Cap Skirring (CSK)",
+  ],
+};
+// Liste fallback générique pour les pays sans liste prédéfinie
+const DEFAULT_AIRPORTS = [];
+
+
 // 🏘 Types de biens (5 catégories)
 const PROPERTY_TYPES = {
   "apartment": { icon: "🏠", label: "Appartement", labelShort: "Apparts", labelFull: "Logement entier", bgGradient: "linear-gradient(135deg,#fef3c7,#fde68a)", category: "lodging" },
@@ -352,6 +505,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [listings, setListings] = useState([]);
   const [customLodgingTypes, setCustomLodgingTypes] = useState([]); // 🏷️ types de logement ajoutés par les proprios (Firebase)
+  const [customAirports, setCustomAirports] = useState([]); // ✈️ aéroports ajoutés par les proprios (Firebase)
   const [lodgingCacheVersion, setLodgingCacheVersion] = useState(0); // force re-render quand le cache des types custom change
   const [bookings, setBookings] = useState([]);
   const [users, setUsers] = useState([]);
@@ -420,6 +574,13 @@ export default function App() {
       setCustomLodgingTypes(fbTypes);
     }, (err) => {
       console.log("Firebase customLodgingTypes error:", err);
+    });
+    // 🔥 FIREBASE : écouter les aéroports ajoutés par les proprios (partagés par tous)
+    const unsubAirports = onSnapshot(collection(db, "customAirports"), (snapshot) => {
+      const fbAirports = snapshot.docs.map(d => ({ ...d.data(), fbId: d.id }));
+      setCustomAirports(fbAirports);
+    }, (err) => {
+      console.log("Firebase customAirports error:", err);
     });
     // 🔥 FIREBASE : écouter les comptes en temps réel (partagés entre appareils)
     const unsubUsers = onSnapshot(collection(db, "users"), async (snapshot) => {
@@ -493,7 +654,7 @@ export default function App() {
     }, (err) => {
       console.log("Firebase debtPayments error:", err);
     });
-    return () => { unsub(); unsubLodgingTypes(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); unsubPayouts(); unsubDebtPayments(); };
+    return () => { unsub(); unsubLodgingTypes(); unsubAirports(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); unsubPayouts(); unsubDebtPayments(); };
   }, []);
 
   // 🏷️ Remplir le cache global des types de logement custom (pour isLodging, icônes, labels)
@@ -821,6 +982,40 @@ export default function App() {
     }
   };
 
+  // ✈️ Ajouter un aéroport custom (auto-approuvé, partagé par tous)
+  const addCustomAirport = async (country, label) => {
+    const clean = (label || "").trim();
+    const cleanCountry = (country || "").trim();
+    if (clean.length < 3) return { ok: false, error: "Nom trop court" };
+    if (!cleanCountry) return { ok: false, error: "Pays manquant" };
+    // Vérifier les doublons (dans la liste de base + custom)
+    const baseList = AIRPORTS_BY_COUNTRY[cleanCountry] || [];
+    const existsBase = baseList.some(a => a.toLowerCase() === clean.toLowerCase());
+    const existsCustom = customAirports.some(a => a.country === cleanCountry && (a.label || "").toLowerCase() === clean.toLowerCase());
+    if (existsBase || existsCustom) return { ok: false, error: "Cet aéroport existe déjà" };
+    try {
+      await addDoc(collection(db, "customAirports"), {
+        country: cleanCountry,
+        label: clean,
+        createdBy: user?.id || "",
+        createdAt: new Date().toISOString(),
+      });
+      flash(`✓ Aéroport "${clean}" ajouté ! Visible par tous les proprios.`);
+      return { ok: true };
+    } catch (err) {
+      console.log("Erreur ajout aéroport:", err);
+      flash("Erreur lors de l'ajout. Réessayez.", "#ef4444");
+      return { ok: false, error: "Erreur réseau" };
+    }
+  };
+
+  // Helper : récupérer tous les aéroports d'un pays (base + custom)
+  const getAirportsForCountry = (country) => {
+    const base = AIRPORTS_BY_COUNTRY[country] || [];
+    const custom = customAirports.filter(a => a.country === country).map(a => a.label);
+    return [...base, ...custom];
+  };
+
   // ✏️ Modifier une annonce existante
   const updateListing = async (listing, data) => {
     if (!listing.fbId) { flash("Erreur annonce", "#ef4444"); return; }
@@ -968,8 +1163,10 @@ export default function App() {
     const days = Math.max(1, Math.ceil((new Date(to) - new Date(from)) / 86400000));
     const priceInfo = getPriceWithOffer(listing, days);
     const subtotal = priceInfo.total;
-    const commission = Math.round(subtotal * COMMISSION_RATE * 100) / 100;
-    const ownerEarnings = Math.round((subtotal - commission) * 100) / 100;
+    const deliveryFee = info.deliveryFee || 0; // ✈️ frais livraison (vont 100% au proprio)
+    const commission = Math.round(subtotal * COMMISSION_RATE * 100) / 100; // commission sur location seulement
+    const ownerEarnings = Math.round((subtotal - commission + deliveryFee) * 100) / 100; // gains = (location - commission) + livraison
+    const totalPaid = subtotal + deliveryFee;
     const newB = {
       id: Date.now(),
       listingId: listing.id, listingTitle: listing.title, listingType: listing.type,
@@ -979,7 +1176,12 @@ export default function App() {
       pricePerDay: priceInfo.pricePerDay,
       offerApplied: priceInfo.offerApplied,
       saved: priceInfo.saved || 0,
-      subtotal, commission, ownerEarnings, total: subtotal,
+      subtotal, commission, ownerEarnings, total: totalPaid,
+      // ✈️ Infos de livraison
+      deliveryChoice: info.deliveryChoice || "garage",
+      deliveryFee: deliveryFee,
+      deliveryLabel: info.deliveryLabel || "",
+      arrivalTime: info.arrivalTime || "",
       // Infos personnelles du locataire
       renterFullName: info.fullName || user.name,
       renterPhone: info.phone || "",
@@ -998,12 +1200,16 @@ export default function App() {
       flash("Erreur lors de la réservation. Réessayez.", "#ef4444");
       return false;
     }
-    addNotif(listing.ownerId, `🎉 ${info.fullName || user.name} a réservé "${listing.title}" du ${from} au ${to} — Vous gagnez ${ownerEarnings}€`, "new_booking");
-    sendEmail(listing.ownerEmail, `Nouvelle réservation Locatzy`, `${info.fullName || user.name} a réservé du ${from} au ${to}. Tél: ${info.phone || "—"}. Gain: ${ownerEarnings}€`);
+    // ✈️ Info livraison à inclure dans les notifs
+    const deliveryInfo = (info.deliveryChoice && info.deliveryChoice !== "garage" && info.deliveryLabel)
+      ? ` · ${info.deliveryLabel}${info.arrivalTime ? ` (arrivée ${info.arrivalTime})` : ""}`
+      : "";
+    addNotif(listing.ownerId, `🎉 ${info.fullName || user.name} a réservé "${listing.title}" du ${from} au ${to} — Vous gagnez ${ownerEarnings}€${deliveryInfo}`, "new_booking");
+    sendEmail(listing.ownerEmail, `Nouvelle réservation Locatzy`, `${info.fullName || user.name} a réservé du ${from} au ${to}. Tél: ${info.phone || "—"}. Gain: ${ownerEarnings}€.${deliveryInfo ? `\n\nLivraison : ${info.deliveryLabel}${info.arrivalTime ? `\nHeure d'arrivée : ${info.arrivalTime}` : ""}` : ""}`);
     addNotif(getAdminId(), `💰 ${user.name} → "${listing.title}" — Commission : ${commission}€`, "commission");
     sendEmail("blackberrywalid72@gmail.com", `Commission ${commission}€`, `Réservation: ${user.name} → ${listing.title}`);
-    addNotif(user.id, `✓ Réservation confirmée : "${listing.title}" — Total ${subtotal}€`, "confirmation");
-    flash(`✓ Réservation confirmée ! ${subtotal}€`);
+    addNotif(user.id, `✓ Réservation confirmée : "${listing.title}" — Total ${totalPaid}€`, "confirmation");
+    flash(`✓ Réservation confirmée ! ${totalPaid}€`);
     setModal(null);
   };
 
@@ -1476,7 +1682,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -2359,6 +2565,48 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
             )}
           </div>
 
+          {/* ✈️ OPTIONS DE LIVRAISON (véhicules) */}
+          {isVehicle(l.type) && (l.deliveryCity || l.deliveryAirportEnabled) && (
+            <div style={{ background: "#f0fdfa", border: "2px solid #99f6e4", borderRadius: 16, padding: 18, marginBottom: 24 }}>
+              <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 10, color: "#0d9488" }}>✈️ Options de livraison</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: "white", borderRadius: 10 }}>
+                  <span style={{ fontSize: 18 }}>🏠</span>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: 13 }}>Retrait au garage</p>
+                    <p style={{ fontSize: 11, color: "#6b7280" }}>{l.city} — Gratuit</p>
+                  </div>
+                </div>
+                {l.deliveryCity && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: "white", borderRadius: 10 }}>
+                    <span style={{ fontSize: 18 }}>🏙️</span>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontWeight: 700, fontSize: 13 }}>Livraison dans la ville</p>
+                      <p style={{ fontSize: 11, color: "#6b7280" }}>{l.city} — Gratuit</p>
+                    </div>
+                  </div>
+                )}
+                {l.deliveryAirportEnabled && l.airportDeliveries && Object.entries(l.airportDeliveries).filter(([k, v]) => v?.enabled).length > 0 && (
+                  <>
+                    <p style={{ fontWeight: 700, fontSize: 12, color: "#0d9488", marginTop: 6 }}>✈️ Aéroports desservis :</p>
+                    {Object.entries(l.airportDeliveries).filter(([k, v]) => v?.enabled).map(([airport, config]) => (
+                      <div key={airport} style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: "white", borderRadius: 10 }}>
+                        <span style={{ fontSize: 18 }}>✈️</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 600, fontSize: 12 }}>{airport}</p>
+                          <p style={{ fontSize: 11, color: "#6b7280" }}>
+                            {config.price > 0 ? `${config.price}€` : "Gratuit"}
+                            {config.freeFromDays && parseInt(config.freeFromDays) > 0 && config.price > 0 ? ` · 🎁 Gratuit dès ${config.freeFromDays}j de location` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Propriétaire + Messagerie intégrée */}
           <div style={{ background: "#f9fafb", borderRadius: 18, padding: 24, marginBottom: 32 }}>
             <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>💬 Contacter le propriétaire</h3>
@@ -2719,6 +2967,9 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
                   <h3 style={{ fontWeight: 700, marginBottom: 4 }}>{b.listingTitle}</h3>
                   <p style={{ color: "#0a0a0a", fontSize: 14, fontWeight: 600 }}>👤 {b.renterName} ({b.renterEmail})</p>
                   <p style={{ color: "#6b7280", fontSize: 13 }}>📅 {b.from} → {b.to} ({b.days}j){b.renterGuestsCount ? ` · 👥 ${b.renterGuestsCount} pers` : ""}</p>
+                  {b.deliveryLabel && b.deliveryChoice && b.deliveryChoice !== "garage" && (
+                    <p style={{ color: "#0d9488", fontSize: 12, fontWeight: 700, marginTop: 4 }}>{b.deliveryLabel}{b.arrivalTime ? ` · ⏰ Arrivée ${b.arrivalTime}` : ""}</p>
+                  )}
                 </div>
                 <Status status={b.status} />
               </div>
@@ -2782,6 +3033,9 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
                   <h3 style={{ fontWeight: 700, marginBottom: 4 }}>{b.listingTitle}</h3>
                   <p style={{ color: "#6b7280", fontSize: 13 }}>👤 Propriétaire : {b.ownerName}</p>
                   <p style={{ color: "#6b7280", fontSize: 13 }}>📅 {b.from} → {b.to}</p>
+                  {b.deliveryLabel && b.deliveryChoice && b.deliveryChoice !== "garage" && (
+                    <p style={{ color: "#0d9488", fontSize: 12, fontWeight: 700, marginTop: 4 }}>{b.deliveryLabel}{b.arrivalTime ? ` · ⏰ Arrivée ${b.arrivalTime}` : ""}</p>
+                  )}
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div className="display" style={{ fontWeight: 800, fontSize: 22, color: "#14b8a6" }}>{b.total}€</div>
@@ -3172,7 +3426,7 @@ function SearchableSelect({ options, value, onChange, placeholder = "— Choisir
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry }) {
   const [form, setForm] = useState({});
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
@@ -3190,7 +3444,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
     // ✏️ Pré-remplir le formulaire avec l'annonce à modifier
     if (modal?.type === "edit" && modal.data) {
       const l = modal.data;
-      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "", vehicleType: l.vehicleType || "" });
+      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "", vehicleType: l.vehicleType || "", deliveryCity: l.deliveryCity || false, deliveryAirportEnabled: l.deliveryAirportEnabled || false, airportDeliveries: l.airportDeliveries || {} });
       // Pré-charger les photos existantes (sauf si c'est juste un emoji par défaut)
       setPhotos(Array.isArray(l.photos) && l.photos.length > 0 && l.photos[0].startsWith("data:") ? l.photos : []);
     }
@@ -3528,6 +3782,100 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                     <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>🏍 Cylindrée (cm³)</label>
                       <input className="input" type="number" placeholder="125, 600, 1000…" value={form.cc || ""} onChange={e => set("cc", parseInt(e.target.value) || 0)} /></div>
                   )}
+
+                  {/* ✈️ SECTION LIVRAISON — uniquement pour véhicules */}
+                  <div style={{ background: "#f0fdfa", border: "2px solid #99f6e4", borderRadius: 14, padding: 14, marginTop: 8 }}>
+                    <h3 style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "#0d9488" }}>✈️ Options de livraison</h3>
+                    <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Indiquez où vous pouvez livrer le véhicule en plus de votre garage.</p>
+
+                    {/* Option ville */}
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: "white", borderRadius: 10, marginBottom: 10, cursor: "pointer" }}>
+                      <input type="checkbox" checked={!!form.deliveryCity} onChange={e => set("deliveryCity", e.target.checked)} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>🏙️ Livraison dans ma ville ({form.city || "—"})</div>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>Gratuit pour le locataire</div>
+                      </div>
+                    </label>
+
+                    {/* Option aéroports */}
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: "white", borderRadius: 10, marginBottom: 10, cursor: "pointer" }}>
+                      <input type="checkbox" checked={!!form.deliveryAirportEnabled} onChange={e => set("deliveryAirportEnabled", e.target.checked)} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>✈️ Livraison à l'aéroport</div>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>Choisissez les aéroports et les prix ci-dessous</div>
+                      </div>
+                    </label>
+
+                    {/* Liste des aéroports du pays */}
+                    {form.deliveryAirportEnabled && (
+                      <div style={{ marginTop: 10 }}>
+                        {(() => {
+                          const airports = getAirportsForCountry(form.country);
+                          if (!form.country) {
+                            return <p style={{ fontSize: 12, color: "#92400e", padding: 10, background: "#fef3c7", borderRadius: 8 }}>⚠️ Choisissez d'abord le pays de votre annonce</p>;
+                          }
+                          if (airports.length === 0) {
+                            return <p style={{ fontSize: 12, color: "#6b7280", padding: 10 }}>Aucun aéroport pré-listé pour {form.country}. Ajoutez le vôtre ci-dessous ⤵</p>;
+                          }
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+                              {airports.map(airport => {
+                                const config = (form.airportDeliveries || {})[airport] || {};
+                                const enabled = config.enabled || false;
+                                return (
+                                  <div key={airport} style={{ background: enabled ? "#f0fdfa" : "white", border: enabled ? "1.5px solid #14b8a6" : "1px solid #e5e7eb", borderRadius: 10, padding: 10 }}>
+                                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                                      <input type="checkbox" checked={enabled} onChange={e => {
+                                        const newConfig = { ...(form.airportDeliveries || {}) };
+                                        if (e.target.checked) {
+                                          newConfig[airport] = { enabled: true, price: 0, freeFromDays: "" };
+                                        } else {
+                                          delete newConfig[airport];
+                                        }
+                                        set("airportDeliveries", newConfig);
+                                      }} />
+                                      <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>✈️ {airport}</div>
+                                    </label>
+                                    {enabled && (
+                                      <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                                        <div>
+                                          <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>💰 Prix (€)</label>
+                                          <input className="input" type="number" placeholder="0 = gratuit" value={config.price ?? 0} onChange={e => {
+                                            const newConfig = { ...(form.airportDeliveries || {}) };
+                                            newConfig[airport] = { ...config, price: parseFloat(e.target.value) || 0 };
+                                            set("airportDeliveries", newConfig);
+                                          }} style={{ fontSize: 13, padding: 8 }} />
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>🎁 Gratuit à partir de (jours)</label>
+                                          <input className="input" type="number" placeholder="Optionnel" value={config.freeFromDays || ""} onChange={e => {
+                                            const newConfig = { ...(form.airportDeliveries || {}) };
+                                            newConfig[airport] = { ...config, freeFromDays: e.target.value };
+                                            set("airportDeliveries", newConfig);
+                                          }} style={{ fontSize: 13, padding: 8 }} />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Bouton "Ajouter mon aéroport" */}
+                        {form.country && (
+                          <button type="button" onClick={() => {
+                            const label = window.prompt(`Nom de l'aéroport à ajouter pour "${form.country}" (ex: "Tata - Khaled Boulares (TTA)") :`);
+                            if (!label) return;
+                            addCustomAirport(form.country, label);
+                          }} style={{ marginTop: 10, width: "100%", padding: 10, background: "white", border: "1.5px dashed #14b8a6", color: "#0d9488", borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                            ➕ Mon aéroport n'est pas listé
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
               <div>
@@ -3589,7 +3937,31 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
           const { listing, from, to } = modal.data;
           const days = Math.max(1, Math.ceil((new Date(to) - new Date(from)) / 86400000));
           const priceInfo = getPriceWithOffer(listing, days);
-          const total = priceInfo.total;
+          const subtotal = priceInfo.total;
+
+          // ✈️ Calcul du surcoût de livraison (véhicules)
+          const deliveryChoice = form.deliveryChoice || "garage"; // "garage" | "city" | "airport:<name>"
+          let deliveryFee = 0;
+          let deliveryLabel = "🏠 Retrait au garage (gratuit)";
+          if (deliveryChoice === "city") {
+            deliveryFee = 0;
+            deliveryLabel = `🏙️ Livraison à ${listing.city} (gratuit)`;
+          } else if (deliveryChoice.startsWith("airport:")) {
+            const airportName = deliveryChoice.substring(8);
+            const config = (listing.airportDeliveries || {})[airportName];
+            if (config) {
+              const isFree = config.freeFromDays && parseInt(config.freeFromDays) > 0 && days >= parseInt(config.freeFromDays);
+              deliveryFee = isFree ? 0 : (parseFloat(config.price) || 0);
+              deliveryLabel = `✈️ Livraison à ${airportName}${isFree ? " (gratuit dès " + config.freeFromDays + "j)" : (deliveryFee > 0 ? ` (+${deliveryFee}€)` : " (gratuit)")}`;
+            }
+          }
+          const total = subtotal + deliveryFee;
+
+          // Aéroports disponibles pour cette annonce
+          const availableAirports = isVehicle(listing.type) && listing.deliveryAirportEnabled && listing.airportDeliveries
+            ? Object.entries(listing.airportDeliveries).filter(([k, v]) => v?.enabled).map(([k]) => k)
+            : [];
+
           return (
             <>
               {/* Indicateur d'étapes */}
@@ -3609,6 +3981,16 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{getTypeInfo(listing.type)?.icon} {listing.title}</p>
                 <p style={{ fontSize: 12, color: "#6b7280" }}>📍 {listing.city}, {listing.country}</p>
                 <p style={{ fontSize: 12, color: "#6b7280" }}>📅 Du {from} au {to} ({days} jour{days > 1 ? "s" : ""})</p>
+                <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                  <span style={{ color: "#6b7280" }}>Location</span>
+                  <span>{subtotal}€</span>
+                </div>
+                {isVehicle(listing.type) && deliveryChoice !== "garage" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+                    <span style={{ color: "#6b7280" }}>{deliveryLabel}</span>
+                    <span>{deliveryFee > 0 ? `+${deliveryFee}€` : "0€"}</span>
+                  </div>
+                )}
                 <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
                   <span style={{ fontWeight: 700, fontSize: 13 }}>Total</span>
                   <span style={{ fontWeight: 800, fontSize: 16, color: "#14b8a6" }}>{total}€</span>
@@ -3616,6 +3998,58 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {/* ✈️ CHOIX DE LIVRAISON (véhicules) */}
+                {isVehicle(listing.type) && (listing.deliveryCity || listing.deliveryAirportEnabled) && (
+                  <div style={{ background: "#f0fdfa", border: "2px solid #99f6e4", borderRadius: 12, padding: 12 }}>
+                    <label style={{ fontSize: 13, fontWeight: 700, display: "block", marginBottom: 8, color: "#0d9488" }}>🚗 Où voulez-vous récupérer le véhicule ? *</label>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: deliveryChoice === "garage" ? "white" : "transparent", border: deliveryChoice === "garage" ? "2px solid #14b8a6" : "2px solid #e5e7eb", borderRadius: 10, cursor: "pointer" }}>
+                        <input type="radio" name="delivery" checked={deliveryChoice === "garage"} onChange={() => set("deliveryChoice", "garage")} />
+                        <div style={{ flex: 1, fontSize: 13 }}>
+                          <div style={{ fontWeight: 600 }}>🏠 Au garage du propriétaire</div>
+                          <div style={{ fontSize: 11, color: "#6b7280" }}>{listing.city} — Gratuit</div>
+                        </div>
+                      </label>
+                      {listing.deliveryCity && (
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: deliveryChoice === "city" ? "white" : "transparent", border: deliveryChoice === "city" ? "2px solid #14b8a6" : "2px solid #e5e7eb", borderRadius: 10, cursor: "pointer" }}>
+                          <input type="radio" name="delivery" checked={deliveryChoice === "city"} onChange={() => set("deliveryChoice", "city")} />
+                          <div style={{ flex: 1, fontSize: 13 }}>
+                            <div style={{ fontWeight: 600 }}>🏙️ Livraison dans ma ville</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>{listing.city} — Gratuit</div>
+                          </div>
+                        </label>
+                      )}
+                      {availableAirports.map(airport => {
+                        const cfg = listing.airportDeliveries[airport];
+                        const isFree = cfg.freeFromDays && parseInt(cfg.freeFromDays) > 0 && days >= parseInt(cfg.freeFromDays);
+                        const fee = isFree ? 0 : (parseFloat(cfg.price) || 0);
+                        const key = `airport:${airport}`;
+                        return (
+                          <label key={airport} style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: deliveryChoice === key ? "white" : "transparent", border: deliveryChoice === key ? "2px solid #14b8a6" : "2px solid #e5e7eb", borderRadius: 10, cursor: "pointer" }}>
+                            <input type="radio" name="delivery" checked={deliveryChoice === key} onChange={() => set("deliveryChoice", key)} />
+                            <div style={{ flex: 1, fontSize: 13 }}>
+                              <div style={{ fontWeight: 600 }}>✈️ {airport}</div>
+                              <div style={{ fontSize: 11, color: "#6b7280" }}>
+                                {fee > 0 ? `+${fee}€` : "Gratuit"}
+                                {cfg.freeFromDays && parseInt(cfg.freeFromDays) > 0 && cfg.price > 0 && !isFree ? ` · 🎁 Gratuit dès ${cfg.freeFromDays}j` : ""}
+                                {isFree ? ` 🎁 Offert (${days}j ≥ ${cfg.freeFromDays}j)` : ""}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {/* ⏰ Heure d'arrivée OBLIGATOIRE si aéroport */}
+                    {deliveryChoice.startsWith("airport:") && (
+                      <div style={{ marginTop: 12, padding: 10, background: "#fef3c7", borderRadius: 10 }}>
+                        <label style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 6, color: "#92400e" }}>⏰ Heure d'arrivée de votre vol *</label>
+                        <input className="input" type="time" value={form.arrivalTime || ""} onChange={e => set("arrivalTime", e.target.value)} style={{ fontSize: 14 }} />
+                        <p style={{ fontSize: 10, color: "#92400e", marginTop: 4 }}>Le propriétaire vous attendra à cette heure</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Nom complet *</label>
                   <input className="input" placeholder="Votre nom et prénom" value={form.fullName || ""} onChange={e => set("fullName", e.target.value)} /></div>
                 <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📧 Email *</label>
@@ -3657,8 +4091,12 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                     }
                     if (!form.idType) return setFormError("Type de pièce d'identité obligatoire");
                     if (!form.idNumber || !form.idNumber.trim()) return setFormError("Numéro de pièce obligatoire");
+                    // ✈️ Validation livraison : heure d'arrivée obligatoire si aéroport
+                    if (deliveryChoice.startsWith("airport:") && !form.arrivalTime) {
+                      return setFormError("Heure d'arrivée du vol obligatoire pour la livraison aéroport");
+                    }
                     setFormError("");
-                    setModal({ type: "bookingPayment", data: { listing, from, to, info: { fullName: form.fullName, email: form.bookingEmail, phone: form.phone, guestsCount: isLodging(listing.type) ? form.guestsCount : null, idType: form.idType, idNumber: form.idNumber, note: form.bookingNote || "" } } });
+                    setModal({ type: "bookingPayment", data: { listing, from, to, info: { fullName: form.fullName, email: form.bookingEmail, phone: form.phone, guestsCount: isLodging(listing.type) ? form.guestsCount : null, idType: form.idType, idNumber: form.idNumber, note: form.bookingNote || "", deliveryChoice: deliveryChoice, deliveryFee: deliveryFee, deliveryLabel: deliveryLabel, arrivalTime: form.arrivalTime || "" } } });
                   }}>Continuer →</button>
                 </div>
               </div>
@@ -3945,7 +4383,8 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
           const { listing, from, to, info } = modal.data;
           const days = Math.max(1, Math.ceil((new Date(to) - new Date(from)) / 86400000));
           const priceInfo = getPriceWithOffer(listing, days);
-          const total = priceInfo.total;
+          const deliveryFee = info.deliveryFee || 0;
+          const total = priceInfo.total + deliveryFee;
           // 💵 Paiement sur place autorisé seulement si l'arrivée est aujourd'hui ou demain.
           // On compare les jours sans tenir compte de l'heure.
           const today0 = new Date(); today0.setHours(0, 0, 0, 0);
@@ -3989,7 +4428,20 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   ) : (
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
                       <span style={{ color: "#6b7280" }}>{listing.price}€ × {days} jour{days > 1 ? "s" : ""}</span>
-                      <span>{total}€</span>
+                      <span>{priceInfo.total}€</span>
+                    </div>
+                  )}
+                  {/* ✈️ Ligne livraison */}
+                  {deliveryFee > 0 && info.deliveryLabel && (
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 12 }}>
+                      <span style={{ color: "#6b7280" }}>{info.deliveryLabel}</span>
+                      <span>+{deliveryFee}€</span>
+                    </div>
+                  )}
+                  {info.deliveryChoice && info.deliveryChoice !== "garage" && deliveryFee === 0 && info.deliveryLabel && (
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 12 }}>
+                      <span style={{ color: "#6b7280" }}>{info.deliveryLabel}</span>
+                      <span style={{ color: "#16a34a" }}>Gratuit</span>
                     </div>
                   )}
                   <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px dashed #e5e7eb" }}>
