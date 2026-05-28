@@ -265,7 +265,9 @@ function getPriceWithOffer(listing, days) {
   const promoActive = listing.promoPrice && listing.promoUntil && (() => {
     const today = new Date(); today.setHours(0,0,0,0);
     const until = new Date(listing.promoUntil); until.setHours(23,59,59,999);
-    return until >= today && Number(listing.promoPrice) > 0 && Number(listing.promoPrice) < Number(listing.price);
+    let started = true;
+    if (listing.promoFrom) { const from = new Date(listing.promoFrom); from.setHours(0,0,0,0); started = today >= from; }
+    return started && until >= today && Number(listing.promoPrice) > 0 && Number(listing.promoPrice) < Number(listing.price);
   })();
   if (promoActive) {
     return {
@@ -298,7 +300,13 @@ function isPromoActive(listing) {
   if (!listing.promoPrice || !listing.promoUntil) return false;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const until = new Date(listing.promoUntil); until.setHours(23, 59, 59, 999);
-  return until >= today && Number(listing.promoPrice) > 0 && Number(listing.promoPrice) < Number(listing.price);
+  // Date de début optionnelle : si absente, la promo a déjà commencé
+  let started = true;
+  if (listing.promoFrom) {
+    const from = new Date(listing.promoFrom); from.setHours(0, 0, 0, 0);
+    started = today >= from;
+  }
+  return started && until >= today && Number(listing.promoPrice) > 0 && Number(listing.promoPrice) < Number(listing.price);
 }
 
 // 🎁 Prix effectif d'une annonce (promo prioritaire, sinon prix normal)
@@ -2779,16 +2787,16 @@ export default function App() {
 
   // 🏦 Enregistrer les infos de paiement du propriétaire (RIB ou Wafacash)
   // ✅ Soumettre une pièce d'identité pour vérification
-  const submitIdentity = async (idImage) => {
+  const submitIdentity = async (idRecto, idVerso) => {
     if (!user || !user.fbId) { flash("Erreur compte", "#ef4444"); return; }
     try {
-      await updateDoc(doc(db, "users", user.fbId), { identityStatus: "pending", identityImage: idImage, identitySubmittedAt: new Date().toISOString() });
-      const updatedUser = { ...user, identityStatus: "pending", identityImage: idImage };
+      await updateDoc(doc(db, "users", user.fbId), { identityStatus: "pending", identityRecto: idRecto, identityVerso: idVerso, identitySubmittedAt: new Date().toISOString() });
+      const updatedUser = { ...user, identityStatus: "pending", identityRecto: idRecto, identityVerso: idVerso };
       setUser(updatedUser);
       localStorage.setItem("lcy_session", JSON.stringify(updatedUser));
       // Prévenir l'admin
-      addNotif(getAdminId(), `🆔 ${user.name} a soumis sa pièce d'identité pour vérification`, "identity");
-      sendEmail("blackberrywalid72@gmail.com", `Vérification identité — ${user.name}`, `${user.name} (${user.email}) a soumis sa pièce d'identité. Vérifiez dans l'admin.`);
+      addNotif(getAdminId(), `🆔 ${user.name} a soumis sa pièce d'identité (recto/verso) pour vérification`, "identity");
+      sendEmail("blackberrywalid72@gmail.com", `Vérification identité — ${user.name}`, `${user.name} (${user.email}) a soumis sa pièce d'identité (recto + verso). Vérifiez dans l'admin.`);
       flash("✅ Pièce envoyée ! Vérification sous 48h.");
     } catch (e) {
       console.log("Erreur submitIdentity:", e);
@@ -2798,13 +2806,21 @@ export default function App() {
 
   // ✅ Admin : valider ou refuser une identité
   const setIdentityStatus = async (targetUser, status) => {
-    if (!targetUser?.fbId) return;
+    if (!targetUser?.fbId) { flash("Erreur utilisateur", "#ef4444"); return; }
     try {
       await updateDoc(doc(db, "users", targetUser.fbId), { identityStatus: status });
-      addNotif(targetUser.id, status === "verified" ? "✅ Votre identité a été vérifiée ! Vous avez maintenant le badge Vérifié." : "❌ Votre vérification d'identité a été refusée. Réessayez avec une pièce plus claire.", "identity");
-      flash(status === "verified" ? "Identité validée" : "Identité refusée");
+      const targetId = targetUser.id || targetUser.fbId;
+      addNotif(targetId, status === "verified" ? "✅ Votre identité a été vérifiée ! Vous avez maintenant le badge Vérifié." : "❌ Votre vérification d'identité a été refusée. Réessayez avec une pièce plus claire.", "identity");
+      // Si c'est l'utilisateur connecté lui-même, rafraîchir sa session
+      if (user && (user.fbId === targetUser.fbId)) {
+        const updatedUser = { ...user, identityStatus: status };
+        setUser(updatedUser);
+        localStorage.setItem("lcy_session", JSON.stringify(updatedUser));
+      }
+      flash(status === "verified" ? "✅ Identité validée" : "Identité refusée");
     } catch (e) {
       console.log("Erreur setIdentityStatus:", e);
+      flash("Erreur, réessayez", "#ef4444");
     }
   };
 
@@ -4301,9 +4317,6 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
             )}
           </div>
 
-          {/* 📅 CALENDRIER DE DISPONIBILITÉ */}
-          <PublicAvailabilityCalendar listing={l} bookings={bookings} t={t} />
-
           {/* ✈️ OPTIONS DE LIVRAISON (véhicules) */}
           {isVehicle(l.type) && (l.deliveryCity || l.deliveryAirportEnabled) && (
             <div style={{ background: "#f0fdfa", border: "2px solid #99f6e4", borderRadius: 16, padding: 18, marginBottom: 24 }}>
@@ -4906,7 +4919,7 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        {[["dashboard","📊 Vue d'ensemble"],["pending",`⏳ À modérer (${pending.length})`],["bookings","💰 Réservations"],["payouts",`💸 Versements (${payouts.filter(p => p.status === "pending").length})`],["debts",`💳 Paiements dettes (${(debtPayments || []).filter(d => d.status === "pending").length})`],["listings","📋 Annonces"],["users","👥 Users"],["reviews",`⭐ Avis (${reviews.length})`]].map(([v,l]) => <button key={v} className={`pill ${tab === v ? "active" : ""}`} onClick={() => setTab(v)}>{l}</button>)}
+        {[["dashboard","📊 Vue d'ensemble"],["pending",`⏳ À modérer (${pending.length})`],["bookings","💰 Réservations"],["payouts",`💸 Versements (${payouts.filter(p => p.status === "pending").length})`],["debts",`💳 Paiements dettes (${(debtPayments || []).filter(d => d.status === "pending").length})`],["listings","📋 Annonces"],["users",`👥 Users${users.filter(u => u.identityStatus === "pending").length > 0 ? ` (${users.filter(u => u.identityStatus === "pending").length})` : ""}`],["reviews",`⭐ Avis (${reviews.length})`]].map(([v,l]) => <button key={v} className={`pill ${tab === v ? "active" : ""}`} onClick={() => setTab(v)}>{l}</button>)}
       </div>
 
       {tab === "dashboard" && (
@@ -5077,9 +5090,12 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
               <div style={{ flex: 1 }}>
                 <h4 style={{ fontWeight: 700 }}>{u.name} {u.role === "admin" && <span style={{ fontSize: 10, background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 50, fontWeight: 700 }}>ADMIN</span>} {u.identityStatus === "verified" && <span style={{ fontSize: 10, background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 50, fontWeight: 700 }}>✅ VÉRIFIÉ</span>} {u.identityStatus === "pending" && <span style={{ fontSize: 10, background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 50, fontWeight: 700 }}>⏳ À VÉRIFIER</span>}</h4>
                 <p style={{ color: "#6b7280", fontSize: 13 }}>{u.email} · {u.country}</p>
-                {u.identityStatus === "pending" && u.identityImage && (
+                {u.identityStatus === "pending" && (u.identityRecto || u.identityImage) && (
                   <div style={{ marginTop: 8 }}>
-                    <img src={u.identityImage} alt="Pièce" style={{ maxWidth: 180, borderRadius: 8, border: "1px solid #e5e7eb" }} />
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {(u.identityRecto || u.identityImage) && <div><p style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Recto</p><img src={u.identityRecto || u.identityImage} alt="Recto" style={{ maxWidth: 140, borderRadius: 8, border: "1px solid #e5e7eb" }} /></div>}
+                      {u.identityVerso && <div><p style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Verso</p><img src={u.identityVerso} alt="Verso" style={{ maxWidth: 140, borderRadius: 8, border: "1px solid #e5e7eb" }} /></div>}
+                    </div>
                     <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                       <button className="btn" style={{ background: "#dcfce7", color: "#166534", padding: "6px 12px", fontSize: 12 }} onClick={() => setIdentityStatus(u, "verified")}>✅ Valider</button>
                       <button className="btn" style={{ background: "#fee2e2", color: "#dc2626", padding: "6px 12px", fontSize: 12 }} onClick={() => setIdentityStatus(u, "rejected")}>❌ Refuser</button>
@@ -5200,7 +5216,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
     // ✏️ Pré-remplir le formulaire avec l'annonce à modifier
     if (modal?.type === "edit" && modal.data) {
       const l = modal.data;
-      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "", vehicleType: l.vehicleType || "", deliveryCity: l.deliveryCity || false, deliveryAirportEnabled: l.deliveryAirportEnabled || false, airportDeliveries: l.airportDeliveries || {}, promoPrice: l.promoPrice || "", promoUntil: l.promoUntil || "" });
+      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "", vehicleType: l.vehicleType || "", deliveryCity: l.deliveryCity || false, deliveryAirportEnabled: l.deliveryAirportEnabled || false, airportDeliveries: l.airportDeliveries || {}, promoPrice: l.promoPrice || "", promoUntil: l.promoUntil || "", promoFrom: l.promoFrom || "" });
       // Pré-charger les photos existantes (sauf si c'est juste un emoji par défaut)
       setPhotos(Array.isArray(l.photos) && l.photos.length > 0 && l.photos[0].startsWith("data:") ? l.photos : []);
     }
@@ -5236,20 +5252,39 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
               <div style={{ background: "#fef3c7", color: "#92400e", padding: 16, borderRadius: 12, textAlign: "center", fontWeight: 700 }}>⏳ {tr("identity_pending")}</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <label style={{ border: "2px dashed #14b8a6", borderRadius: 12, padding: 24, textAlign: "center", cursor: "pointer", background: "#f0fdfa" }}>
-                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = ev => set("idImage", ev.target.result);
-                    reader.readAsDataURL(file);
-                  }} />
-                  {form.idImage ? <img src={form.idImage} alt="ID" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8 }} /> : <span style={{ color: "#0d9488", fontWeight: 600 }}>📎 {tr("upload_id")}</span>}
-                </label>
+                {/* RECTO */}
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>1️⃣ Recto (devant)</p>
+                  <label style={{ border: "2px dashed #14b8a6", borderRadius: 12, padding: 18, textAlign: "center", cursor: "pointer", background: "#f0fdfa", display: "block" }}>
+                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => set("idRecto", ev.target.result);
+                      reader.readAsDataURL(file);
+                    }} />
+                    {form.idRecto ? <img src={form.idRecto} alt="Recto" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 8 }} /> : <span style={{ color: "#0d9488", fontWeight: 600 }}>📎 Photo du recto</span>}
+                  </label>
+                </div>
+                {/* VERSO */}
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>2️⃣ Verso (derrière)</p>
+                  <label style={{ border: "2px dashed #14b8a6", borderRadius: 12, padding: 18, textAlign: "center", cursor: "pointer", background: "#f0fdfa", display: "block" }}>
+                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => set("idVerso", ev.target.result);
+                      reader.readAsDataURL(file);
+                    }} />
+                    {form.idVerso ? <img src={form.idVerso} alt="Verso" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 8 }} /> : <span style={{ color: "#0d9488", fontWeight: 600 }}>📎 Photo du verso</span>}
+                  </label>
+                </div>
                 {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
                 <button className="btn btn-primary" style={{ width: "100%", padding: 14 }} onClick={() => {
-                  if (!form.idImage) { setFormError("Veuillez choisir une photo de votre pièce"); return; }
-                  submitIdentity(form.idImage);
+                  if (!form.idRecto) { setFormError("Veuillez ajouter la photo du recto"); return; }
+                  if (!form.idVerso) { setFormError("Veuillez ajouter la photo du verso"); return; }
+                  submitIdentity(form.idRecto, form.idVerso);
                   setModal(null);
                 }}>✅ {tr("upload_id")}</button>
               </div>
@@ -5623,14 +5658,19 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                     <label style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d" }}>{tr("promo_price")}</label>
                     <input className="input" type="number" placeholder="20" value={form.promoPrice || ""} onChange={e => set("promoPrice", parseFloat(e.target.value) || 0)} style={{ background: "white", marginTop: 4 }} />
                   </div>
+                  <div></div>
                   <div>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d" }}>{tr("promo_until")}</label>
-                    <input className="input" type="date" min={new Date().toISOString().split("T")[0]} value={form.promoUntil || ""} onChange={e => set("promoUntil", e.target.value)} style={{ background: "white", marginTop: 4 }} />
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d" }}>📅 Début</label>
+                    <input className="input" type="date" min={new Date().toISOString().split("T")[0]} value={form.promoFrom || ""} onChange={e => set("promoFrom", e.target.value)} style={{ background: "white", marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d" }}>📅 Fin</label>
+                    <input className="input" type="date" min={form.promoFrom || new Date().toISOString().split("T")[0]} value={form.promoUntil || ""} onChange={e => set("promoUntil", e.target.value)} style={{ background: "white", marginTop: 4 }} />
                   </div>
                 </div>
                 {form.promoPrice > 0 && form.promoUntil && form.price > 0 && form.promoPrice < form.price && (
                   <p style={{ fontSize: 11, color: "#991b1b", background: "#fee2e2", padding: 8, borderRadius: 8, marginTop: 8 }}>
-                    🔥 Promo : <strong>{form.promoPrice}€/jour</strong> au lieu de {form.price}€ (−<strong>{Math.round((1 - form.promoPrice / form.price) * 100)}%</strong>) jusqu'au {form.promoUntil}
+                    🔥 Promo : <strong>{form.promoPrice}€/jour</strong> au lieu de {form.price}€ (−<strong>{Math.round((1 - form.promoPrice / form.price) * 100)}%</strong>){form.promoFrom ? ` du ${form.promoFrom}` : ""} jusqu'au {form.promoUntil}
                   </p>
                 )}
                 {form.promoPrice > 0 && form.price > 0 && form.promoPrice >= form.price && (
@@ -6871,7 +6911,7 @@ function BookingCalendar({ listing, user, book, setModal }) {
           {priceInfo.offerApplied ? (
             <>
               <div style={{ background: "#14b8a6", color: "white", padding: 8, borderRadius: 8, marginBottom: 10, textAlign: "center", fontSize: 12, fontWeight: 700 }}>
-                🎁 Offre {listing.offerMinDays}+ jours appliquée !
+                {priceInfo.promoApplied ? "🔥 Promotion appliquée !" : `🎁 Offre ${listing.offerMinDays}+ jours appliquée !`}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a3a3a3", textDecoration: "line-through" }}><span>Prix normal {listing.price}€ × {days}</span><span>{priceInfo.originalTotal}€</span></div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "white", fontWeight: 600 }}><span>Prix offre {priceInfo.pricePerDay}€ × {days}</span><span>{total}€</span></div>
