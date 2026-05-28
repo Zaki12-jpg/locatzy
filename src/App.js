@@ -1968,6 +1968,19 @@ export default function App() {
     // Si c'était déjà une belle URL (pathMatch), on la garde telle quelle ✨
   }, [listings]);
 
+  // 🔗 Au premier chargement : si l'URL est une page (/messages, /annonces...), afficher la bonne page
+  useEffect(() => {
+    const path = window.location.pathname;
+    // Ne rien faire si c'est une URL d'annonce (gérée ailleurs) ou la racine
+    if (path === "/" || /\/(logement|vehicule)\/[^/]+\/\d+/.test(path)) return;
+    const mapping = { "/annonces": "my", "/messages": "messages", "/notifications": "notif", "/admin": "admin", "/profil": "profile", "/favoris": "favorites" };
+    const targetPage = mapping[path];
+    if (targetPage) {
+      // Pour les pages qui nécessitent une connexion, on attend que user soit chargé
+      setPageRaw(targetPage);
+    }
+  }, []);
+
 
   const reload = () => {
     setListings(DB.get("lcy_listings"));
@@ -2752,11 +2765,28 @@ export default function App() {
   // 🔙 NAVIGATION AVEC HISTORIQUE
   // setPage enregistre la page actuelle dans l'historique avant de changer,
   // pour que le bouton "précédent" et le swipe sachent d'où on vient.
+  // Correspondance page → adresse URL propre
+  const PAGE_URLS = {
+    home: "/",
+    my: "/annonces",
+    messages: "/messages",
+    notif: "/notifications",
+    admin: "/admin",
+    profile: "/profil",
+    favorites: "/favoris",
+  };
+
   const setPage = (newPage) => {
     setPageRaw(prev => {
       if (newPage !== prev) setPageHistory(h => [...h, prev]);
       return newPage;
     });
+    // Mettre à jour l'URL du navigateur selon la page (sauf "detail" qui a sa propre belle URL)
+    if (newPage !== "detail" && PAGE_URLS[newPage] !== undefined) {
+      try {
+        window.history.pushState({}, "", window.location.origin + PAGE_URLS[newPage]);
+      } catch (e) { /* ignore */ }
+    }
   };
   // Revenir à la page précédente (ou Accueil si l'historique est vide)
   const goBack = () => {
@@ -2787,14 +2817,17 @@ export default function App() {
     } catch (e) { /* ignore si erreur URL */ }
   };
 
-  // 🔙 Gérer le bouton "Retour" du navigateur quand l'URL a changé (belle URL)
+  // 🔙 Gérer le bouton "Retour" du navigateur : afficher la bonne page selon l'URL
   useEffect(() => {
     const handlePopState = () => {
-      const isDetailUrl = /\/(logement|vehicule)\/[^/]+\/\d+/.test(window.location.pathname);
-      if (!isDetailUrl) {
-        setPageRaw("home");
-        setSelectedListing(null);
-      }
+      const path = window.location.pathname;
+      // Si c'est une belle URL d'annonce, on laisse le détail tel quel
+      if (/\/(logement|vehicule)\/[^/]+\/\d+/.test(path)) return;
+      // Sinon, retrouver la page correspondant à l'URL
+      const pageEntry = Object.entries(PAGE_URLS).find(([, url]) => url === path);
+      const targetPage = pageEntry ? pageEntry[0] : "home";
+      setPageRaw(targetPage);
+      setSelectedListing(null);
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
