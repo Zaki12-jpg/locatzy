@@ -4751,10 +4751,8 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                                   <button type="button" onClick={() => {
                                     const newConfig = { ...currentConfig };
                                     if (allChecked) {
-                                      // Tout décocher
                                       airports.forEach(a => delete newConfig[a]);
                                     } else {
-                                      // Tout cocher
                                       airports.forEach(a => {
                                         if (!newConfig[a]?.enabled) {
                                           newConfig[a] = { enabled: true, price: 0, freeFromDays: "" };
@@ -4765,34 +4763,60 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                                   }} style={{ padding: 8, background: allChecked ? "#fee2e2" : "#dcfce7", color: allChecked ? "#991b1b" : "#065f46", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                                     {allChecked ? "☒ Tout décocher" : "☑ Tout cocher"}
                                   </button>
-                                  <button type="button" onClick={() => {
-                                    const priceStr = window.prompt(`💰 Appliquer le même prix à tous les aéroports cochés.\nEntrez le prix en € (0 = gratuit) :`, "0");
-                                    if (priceStr === null) return;
-                                    const price = parseFloat(priceStr) || 0;
-                                    const newConfig = { ...currentConfig };
-                                    airports.forEach(a => {
-                                      if (newConfig[a]?.enabled) {
-                                        newConfig[a] = { ...newConfig[a], price };
-                                      }
-                                    });
-                                    set("airportDeliveries", newConfig);
-                                  }} style={{ padding: 8, background: "#dbeafe", color: "#1e40af", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer" }} disabled={checkedCount === 0}>
+                                  <button type="button" onClick={() => set("bulkAction", form.bulkAction === "price" ? null : "price")} disabled={checkedCount === 0} style={{ padding: 8, background: form.bulkAction === "price" ? "#1e40af" : "#dbeafe", color: form.bulkAction === "price" ? "white" : "#1e40af", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: checkedCount === 0 ? "not-allowed" : "pointer", opacity: checkedCount === 0 ? 0.5 : 1 }}>
                                     💰 Même prix partout
                                   </button>
                                 </div>
-                                <button type="button" onClick={() => {
-                                  const daysStr = window.prompt(`🎁 Appliquer le même seuil de gratuité à tous les aéroports cochés.\nEntrez le nombre de jours (laissez vide pour aucun seuil) :`, "");
-                                  if (daysStr === null) return;
-                                  const newConfig = { ...currentConfig };
-                                  airports.forEach(a => {
-                                    if (newConfig[a]?.enabled) {
-                                      newConfig[a] = { ...newConfig[a], freeFromDays: daysStr };
-                                    }
-                                  });
-                                  set("airportDeliveries", newConfig);
-                                }} style={{ width: "100%", padding: 8, background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer" }} disabled={checkedCount === 0}>
+
+                                {/* 📝 MINI-PANNEAU : Même prix partout */}
+                                {form.bulkAction === "price" && (
+                                  <div style={{ background: "#dbeafe", border: "1.5px solid #3b82f6", borderRadius: 8, padding: 10, marginBottom: 6 }}>
+                                    <p style={{ fontSize: 11, color: "#1e40af", fontWeight: 700, marginBottom: 6 }}>💰 Prix à appliquer aux {checkedCount} aéroport{checkedCount > 1 ? "s" : ""} coché{checkedCount > 1 ? "s" : ""} :</p>
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                      <input type="number" placeholder="0 = gratuit" value={form.bulkPriceValue ?? ""} onChange={e => set("bulkPriceValue", e.target.value)} autoFocus style={{ flex: 1, padding: 8, border: "1.5px solid #3b82f6", borderRadius: 6, fontSize: 13, outline: "none" }} />
+                                      <button type="button" onClick={() => {
+                                        const price = parseFloat(form.bulkPriceValue) || 0;
+                                        const newConfig = { ...currentConfig };
+                                        airports.forEach(a => {
+                                          if (newConfig[a]?.enabled) {
+                                            newConfig[a] = { ...newConfig[a], price };
+                                          }
+                                        });
+                                        set("airportDeliveries", newConfig);
+                                        set("bulkAction", null);
+                                        set("bulkPriceValue", "");
+                                      }} style={{ padding: "8px 16px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✓ OK</button>
+                                      <button type="button" onClick={() => { set("bulkAction", null); set("bulkPriceValue", ""); }} style={{ padding: "8px 12px", background: "white", color: "#6b7280", border: "1.5px solid #d1d5db", borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>×</button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                <button type="button" onClick={() => set("bulkAction", form.bulkAction === "freeDays" ? null : "freeDays")} disabled={checkedCount === 0} style={{ width: "100%", padding: 8, background: form.bulkAction === "freeDays" ? "#92400e" : "#fef3c7", color: form.bulkAction === "freeDays" ? "white" : "#92400e", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: checkedCount === 0 ? "not-allowed" : "pointer", opacity: checkedCount === 0 ? 0.5 : 1 }}>
                                   🎁 Même seuil de gratuité partout
                                 </button>
+
+                                {/* 📝 MINI-PANNEAU : Seuil gratuité */}
+                                {form.bulkAction === "freeDays" && (
+                                  <div style={{ background: "#fef3c7", border: "1.5px solid #f59e0b", borderRadius: 8, padding: 10, marginTop: 6 }}>
+                                    <p style={{ fontSize: 11, color: "#92400e", fontWeight: 700, marginBottom: 6 }}>🎁 Gratuit dès N jours (vide = pas de seuil) :</p>
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                      <input type="number" placeholder="Ex : 10" value={form.bulkDaysValue ?? ""} onChange={e => set("bulkDaysValue", e.target.value)} autoFocus style={{ flex: 1, padding: 8, border: "1.5px solid #f59e0b", borderRadius: 6, fontSize: 13, outline: "none" }} />
+                                      <button type="button" onClick={() => {
+                                        const days = form.bulkDaysValue || "";
+                                        const newConfig = { ...currentConfig };
+                                        airports.forEach(a => {
+                                          if (newConfig[a]?.enabled) {
+                                            newConfig[a] = { ...newConfig[a], freeFromDays: days };
+                                          }
+                                        });
+                                        set("airportDeliveries", newConfig);
+                                        set("bulkAction", null);
+                                        set("bulkDaysValue", "");
+                                      }} style={{ padding: "8px 16px", background: "#f59e0b", color: "white", border: "none", borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✓ OK</button>
+                                      <button type="button" onClick={() => { set("bulkAction", null); set("bulkDaysValue", ""); }} style={{ padding: "8px 12px", background: "white", color: "#6b7280", border: "1.5px solid #d1d5db", borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>×</button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
 
                               {/* 🔍 Barre de recherche */}
@@ -4862,15 +4886,30 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                           );
                         })()}
 
-                        {/* Bouton "Ajouter mon aéroport" */}
+                        {/* Bouton "Ajouter mon aéroport" + mini-panneau */}
                         {form.country && (
-                          <button type="button" onClick={() => {
-                            const label = window.prompt(`Nom de l'aéroport à ajouter pour "${form.country}" (ex: "Tata - Khaled Boulares (TTA)") :`);
-                            if (!label) return;
-                            addCustomAirport(form.country, label);
-                          }} style={{ marginTop: 10, width: "100%", padding: 10, background: "white", border: "1.5px dashed #14b8a6", color: "#0d9488", borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                            ➕ Mon aéroport n'est pas listé
-                          </button>
+                          <>
+                            <button type="button" onClick={() => set("bulkAction", form.bulkAction === "addAirport" ? null : "addAirport")} style={{ marginTop: 10, width: "100%", padding: 10, background: form.bulkAction === "addAirport" ? "#0d9488" : "white", border: "1.5px dashed #14b8a6", color: form.bulkAction === "addAirport" ? "white" : "#0d9488", borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                              ➕ Mon aéroport n'est pas listé
+                            </button>
+                            {form.bulkAction === "addAirport" && (
+                              <div style={{ background: "#f0fdfa", border: "1.5px solid #14b8a6", borderRadius: 8, padding: 10, marginTop: 6 }}>
+                                <p style={{ fontSize: 11, color: "#0d9488", fontWeight: 700, marginBottom: 6 }}>✈️ Nom de l'aéroport (ex: "Tata - Khaled Boulares (TTA)")</p>
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <input type="text" placeholder="Ville - Nom (CODE)" value={form.newAirportName || ""} onChange={e => set("newAirportName", e.target.value)} autoFocus style={{ flex: 1, padding: 8, border: "1.5px solid #14b8a6", borderRadius: 6, fontSize: 13, outline: "none" }} />
+                                  <button type="button" onClick={async () => {
+                                    if (!form.newAirportName || form.newAirportName.trim().length < 3) return;
+                                    const r = await addCustomAirport(form.country, form.newAirportName);
+                                    if (r?.ok) {
+                                      set("bulkAction", null);
+                                      set("newAirportName", "");
+                                    }
+                                  }} style={{ padding: "8px 16px", background: "#14b8a6", color: "white", border: "none", borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>✓ Ajouter</button>
+                                  <button type="button" onClick={() => { set("bulkAction", null); set("newAirportName", ""); }} style={{ padding: "8px 12px", background: "white", color: "#6b7280", border: "1.5px solid #d1d5db", borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>×</button>
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
