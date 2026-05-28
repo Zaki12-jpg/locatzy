@@ -4575,6 +4575,12 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
   const [tab, setTab] = useState("listings");
   const [statusFilter, setStatusFilter] = useState("all"); // all | pending | confirmed
   const reservationsRef = useRef(null); // pour faire défiler vers les réservations
+  // Aller à un onglet + descendre automatiquement vers la liste
+  const goToTab = (targetTab, filter) => {
+    setTab(targetTab);
+    if (filter) setStatusFilter(filter);
+    setTimeout(() => { if (reservationsRef.current) reservationsRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
+  };
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
 
   // Filtrer une liste de réservations selon le filtre choisi
@@ -4600,8 +4606,8 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
       <p style={{ color: "#6b7280", marginBottom: 28 }}>{tr("my_space_sub")}</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 28 }}>
-        <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📋 {tr("my_listings")}</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{myListings.length}</div></div>
-        <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📅 {tr("received_bookings")}</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{bookingsOnMyListings.length}</div></div>
+        <div className="card" onClick={() => goToTab("listings")} style={{ padding: 22, cursor: "pointer" }}><div style={{ fontSize: 13, color: "#6b7280" }}>📋 {tr("my_listings")} · 👆</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{myListings.length}</div></div>
+        <div className="card" onClick={() => goToTab("received")} style={{ padding: 22, cursor: "pointer" }}><div style={{ fontSize: 13, color: "#6b7280" }}>📅 {tr("received_bookings")} · 👆</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{bookingsOnMyListings.length}</div></div>
 
         {/* 💰 Mes gains (total cumulé depuis le début) */}
         <div className="card" style={{ padding: 22, background: "linear-gradient(135deg,#14b8a6,#0d9488)", color: "white", border: "none" }}>
@@ -4655,12 +4661,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
           );
           const pendingAmount = pendingReservations.reduce((s, b) => s + (b.ownerEarnings || 0), 0);
           return (
-            <div className="card" onClick={() => {
-              setTab("received");
-              setStatusFilter("pending");
-              // Faire défiler vers les réservations après un court instant (le temps que l'onglet s'affiche)
-              setTimeout(() => { if (reservationsRef.current) reservationsRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
-            }} style={{ padding: 22, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", border: "none", cursor: "pointer" }}>
+            <div className="card" onClick={() => goToTab("received", "pending")} style={{ padding: 22, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", border: "none", cursor: "pointer" }}>
               <div style={{ fontSize: 13, opacity: 0.9 }}>⏳ Réservations en attente</div>
               <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{pendingAmount.toFixed(2)}€</div>
               <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>{pendingReservations.length} en cours (clés non remises) · 👆 voir</div>
@@ -4921,6 +4922,11 @@ function NotifPage({ notifications, goToNotif, t }) {
 // ─── ADMIN ───────────────────────────────────────────────────────────
 function Admin({ listings, bookings, users, approveListing, rejectListing, deleteListing, deleteUser, reviews, payouts, markPayoutPaid, debtPayments, confirmDebtPayment, setIdentityStatus }) {
   const [tab, setTab] = useState("dashboard");
+  const adminTabsRef = useRef(null);
+  const goToAdminTab = (targetTab) => {
+    setTab(targetTab);
+    setTimeout(() => { if (adminTabsRef.current) adminTabsRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
+  };
   const pending = listings.filter(l => l.status === "pending");
   const totalRevenue = bookings.reduce((s, b) => s + b.subtotal, 0);
   const myCommission = bookings.reduce((s, b) => s + b.commission, 0);
@@ -4938,16 +4944,16 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
           <div className="display" style={{ fontSize: 38, fontWeight: 800, color: "#14b8a6" }}>{myCommission.toFixed(2)}€</div>
           <p style={{ fontSize: 12, opacity: 0.6 }}>Sur {totalRevenue.toFixed(2)}€ de transactions</p>
         </div>
-        {[["📋","Annonces",listings.length],["👥","Users",users.length],["📅","Réservations",bookings.length],["⭐","Avis",reviews.length]].map(([i,l,v]) => (
-          <div key={l} className="card" style={{ padding: 20 }}>
+        {[["📋","Annonces",listings.length,"listings"],["👥","Users",users.length,"users"],["📅","Réservations",bookings.length,"bookings"],["⭐","Avis",reviews.length,"reviews"]].map(([i,l,v,targetTab]) => (
+          <div key={l} className="card" onClick={() => goToAdminTab(targetTab)} style={{ padding: 20, cursor: "pointer" }}>
             <div style={{ fontSize: 20 }}>{i}</div>
             <div className="display" style={{ fontSize: 28, fontWeight: 800, marginTop: 4 }}>{v}</div>
-            <div style={{ fontSize: 12, color: "#6b7280" }}>{l}</div>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>{l} · 👆</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+      <div ref={adminTabsRef} style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
         {[["dashboard","📊 Vue d'ensemble"],["pending",`⏳ À modérer (${pending.length})`],["bookings","💰 Réservations"],["payouts",`💸 Versements (${payouts.filter(p => p.status === "pending").length})`],["debts",`💳 Paiements dettes (${(debtPayments || []).filter(d => d.status === "pending").length})`],["listings","📋 Annonces"],["users",`👥 Users${users.filter(u => u.identityStatus === "pending").length > 0 ? ` (${users.filter(u => u.identityStatus === "pending").length})` : ""}`],["reviews",`⭐ Avis (${reviews.length})`]].map(([v,l]) => <button key={v} className={`pill ${tab === v ? "active" : ""}`} onClick={() => setTab(v)}>{l}</button>)}
       </div>
 
