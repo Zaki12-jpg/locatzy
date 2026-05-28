@@ -4986,7 +4986,11 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 
       {tab === "pending" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {pending.length === 0 ? <Empty icon="✅" msg="Tout est à jour" /> : pending.map(l => {
+          {pending.length === 0 ? <Empty icon="✅" msg="Tout est à jour" /> : [...pending].sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+            return dateB - dateA;
+          }).map(l => {
             const photo = l.photos[0];
             const isImg = photo && photo.startsWith && photo.startsWith("data:");
             return (
@@ -5104,7 +5108,11 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 
       {tab === "listings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {listings.map(l => (
+          {[...listings].sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+            return dateB - dateA;
+          }).map(l => (
             <div key={l.id} className="card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16 }}>
               <span style={{ fontSize: 24 }}>{getTypeInfo(l.type) && getTypeInfo(l.type).icon || "🏠"}</span>
               <div style={{ flex: 1 }}>
@@ -5121,7 +5129,15 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 
       {tab === "users" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {users.map(u => (
+          {[...users].sort((a, b) => {
+            // Les identités à vérifier remontent en haut
+            const pa = a.identityStatus === "pending" ? 1 : 0;
+            const pb = b.identityStatus === "pending" ? 1 : 0;
+            if (pa !== pb) return pb - pa;
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+            return dateB - dateA;
+          }).map(u => (
             <div key={u.id} className="card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16 }}>
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: u.role === "admin" ? "#0a0a0a" : "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700 }}>{u.name[0]}</div>
               <div style={{ flex: 1 }}>
@@ -5148,7 +5164,11 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
 
       {tab === "reviews" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {reviews.length === 0 ? <Empty icon="⭐" msg="Aucun avis" /> : [...reviews].reverse().map(r => {
+          {reviews.length === 0 ? <Empty icon="⭐" msg="Aucun avis" /> : [...reviews].sort((a, b) => {
+            const dateA = a.date ? new Date(a.date).getTime() : (a.id || 0);
+            const dateB = b.date ? new Date(b.date).getTime() : (b.id || 0);
+            return dateB - dateA;
+          }).map(r => {
             const listing = listings.find(l => l.id === r.listingId);
             return (
               <div key={r.id} className="card" style={{ padding: 18 }}>
