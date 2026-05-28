@@ -985,13 +985,14 @@ export default function App() {
   // ✈️ Ajouter un aéroport custom (auto-approuvé, partagé par tous)
   const addCustomAirport = async (country, label) => {
     const clean = (label || "").trim();
-    const cleanCountry = (country || "").trim();
+    // Nettoyer le nom du pays (enlever drapeau emoji)
+    const cleanCountry = (country || "").replace(/^[\p{Emoji}\u2700-\u27BF\uE000-\uF8FF]+\s*/u, "").trim();
     if (clean.length < 3) return { ok: false, error: "Nom trop court" };
     if (!cleanCountry) return { ok: false, error: "Pays manquant" };
     // Vérifier les doublons (dans la liste de base + custom)
     const baseList = AIRPORTS_BY_COUNTRY[cleanCountry] || [];
     const existsBase = baseList.some(a => a.toLowerCase() === clean.toLowerCase());
-    const existsCustom = customAirports.some(a => a.country === cleanCountry && (a.label || "").toLowerCase() === clean.toLowerCase());
+    const existsCustom = customAirports.some(a => (a.country === cleanCountry || a.country === country) && (a.label || "").toLowerCase() === clean.toLowerCase());
     if (existsBase || existsCustom) return { ok: false, error: "Cet aéroport existe déjà" };
     try {
       await addDoc(collection(db, "customAirports"), {
@@ -1010,9 +1011,17 @@ export default function App() {
   };
 
   // Helper : récupérer tous les aéroports d'un pays (base + custom)
+  // Helper pour nettoyer le nom du pays : "🇲🇦 Maroc" → "Maroc"
+  const cleanCountryName = (country) => {
+    if (!country) return "";
+    // Enlève le drapeau emoji + espace au début
+    return country.replace(/^[\p{Emoji}\u2700-\u27BF\uE000-\uF8FF]+\s*/u, "").trim();
+  };
+
   const getAirportsForCountry = (country) => {
-    const base = AIRPORTS_BY_COUNTRY[country] || [];
-    const custom = customAirports.filter(a => a.country === country).map(a => a.label);
+    const clean = cleanCountryName(country);
+    const base = AIRPORTS_BY_COUNTRY[clean] || AIRPORTS_BY_COUNTRY[country] || [];
+    const custom = customAirports.filter(a => cleanCountryName(a.country) === clean || a.country === country).map(a => a.label);
     return [...base, ...custom];
   };
 
@@ -3817,49 +3826,105 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                           if (airports.length === 0) {
                             return <p style={{ fontSize: 12, color: "#6b7280", padding: 10 }}>Aucun aéroport pré-listé pour {form.country}. Ajoutez le vôtre ci-dessous ⤵</p>;
                           }
+                          const currentConfig = form.airportDeliveries || {};
+                          const checkedCount = airports.filter(a => currentConfig[a]?.enabled).length;
+                          const allChecked = checkedCount === airports.length;
                           return (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
-                              {airports.map(airport => {
-                                const config = (form.airportDeliveries || {})[airport] || {};
-                                const enabled = config.enabled || false;
-                                return (
-                                  <div key={airport} style={{ background: enabled ? "#f0fdfa" : "white", border: enabled ? "1.5px solid #14b8a6" : "1px solid #e5e7eb", borderRadius: 10, padding: 10 }}>
-                                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                                      <input type="checkbox" checked={enabled} onChange={e => {
-                                        const newConfig = { ...(form.airportDeliveries || {}) };
-                                        if (e.target.checked) {
-                                          newConfig[airport] = { enabled: true, price: 0, freeFromDays: "" };
-                                        } else {
-                                          delete newConfig[airport];
+                            <>
+                              {/* 🎛️ BOUTONS D'ACTIONS RAPIDES */}
+                              <div style={{ background: "white", border: "1px solid #99f6e4", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+                                <p style={{ fontSize: 11, color: "#0d9488", fontWeight: 700, marginBottom: 8 }}>⚡ Actions rapides ({checkedCount}/{airports.length} cochés)</p>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                                  <button type="button" onClick={() => {
+                                    const newConfig = { ...currentConfig };
+                                    if (allChecked) {
+                                      // Tout décocher
+                                      airports.forEach(a => delete newConfig[a]);
+                                    } else {
+                                      // Tout cocher
+                                      airports.forEach(a => {
+                                        if (!newConfig[a]?.enabled) {
+                                          newConfig[a] = { enabled: true, price: 0, freeFromDays: "" };
                                         }
-                                        set("airportDeliveries", newConfig);
-                                      }} />
-                                      <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>✈️ {airport}</div>
-                                    </label>
-                                    {enabled && (
-                                      <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                                        <div>
-                                          <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>💰 Prix (€)</label>
-                                          <input className="input" type="number" placeholder="0 = gratuit" value={config.price ?? 0} onChange={e => {
-                                            const newConfig = { ...(form.airportDeliveries || {}) };
-                                            newConfig[airport] = { ...config, price: parseFloat(e.target.value) || 0 };
-                                            set("airportDeliveries", newConfig);
-                                          }} style={{ fontSize: 13, padding: 8 }} />
+                                      });
+                                    }
+                                    set("airportDeliveries", newConfig);
+                                  }} style={{ padding: 8, background: allChecked ? "#fee2e2" : "#dcfce7", color: allChecked ? "#991b1b" : "#065f46", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                                    {allChecked ? "☒ Tout décocher" : "☑ Tout cocher"}
+                                  </button>
+                                  <button type="button" onClick={() => {
+                                    const priceStr = window.prompt(`💰 Appliquer le même prix à tous les aéroports cochés.\nEntrez le prix en € (0 = gratuit) :`, "0");
+                                    if (priceStr === null) return;
+                                    const price = parseFloat(priceStr) || 0;
+                                    const newConfig = { ...currentConfig };
+                                    airports.forEach(a => {
+                                      if (newConfig[a]?.enabled) {
+                                        newConfig[a] = { ...newConfig[a], price };
+                                      }
+                                    });
+                                    set("airportDeliveries", newConfig);
+                                  }} style={{ padding: 8, background: "#dbeafe", color: "#1e40af", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer" }} disabled={checkedCount === 0}>
+                                    💰 Même prix partout
+                                  </button>
+                                </div>
+                                <button type="button" onClick={() => {
+                                  const daysStr = window.prompt(`🎁 Appliquer le même seuil de gratuité à tous les aéroports cochés.\nEntrez le nombre de jours (laissez vide pour aucun seuil) :`, "");
+                                  if (daysStr === null) return;
+                                  const newConfig = { ...currentConfig };
+                                  airports.forEach(a => {
+                                    if (newConfig[a]?.enabled) {
+                                      newConfig[a] = { ...newConfig[a], freeFromDays: daysStr };
+                                    }
+                                  });
+                                  set("airportDeliveries", newConfig);
+                                }} style={{ width: "100%", padding: 8, background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer" }} disabled={checkedCount === 0}>
+                                  🎁 Même seuil de gratuité partout
+                                </button>
+                              </div>
+
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+                                {airports.map(airport => {
+                                  const config = currentConfig[airport] || {};
+                                  const enabled = config.enabled || false;
+                                  return (
+                                    <div key={airport} style={{ background: enabled ? "#f0fdfa" : "white", border: enabled ? "1.5px solid #14b8a6" : "1px solid #e5e7eb", borderRadius: 10, padding: 10 }}>
+                                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                                        <input type="checkbox" checked={enabled} onChange={e => {
+                                          const newConfig = { ...(form.airportDeliveries || {}) };
+                                          if (e.target.checked) {
+                                            newConfig[airport] = { enabled: true, price: 0, freeFromDays: "" };
+                                          } else {
+                                            delete newConfig[airport];
+                                          }
+                                          set("airportDeliveries", newConfig);
+                                        }} />
+                                        <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>✈️ {airport}</div>
+                                      </label>
+                                      {enabled && (
+                                        <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                                          <div>
+                                            <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>💰 Prix (€)</label>
+                                            <input className="input" type="number" placeholder="0 = gratuit" value={config.price ?? 0} onChange={e => {
+                                              const newConfig = { ...(form.airportDeliveries || {}) };
+                                              newConfig[airport] = { ...config, price: parseFloat(e.target.value) || 0 };
+                                              set("airportDeliveries", newConfig);
+                                            }} style={{ fontSize: 13, padding: 8 }} />
+                                          </div>
+                                          <div>
+                                            <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>🎁 Gratuit à partir de (jours)</label>
+                                            <input className="input" type="number" placeholder="Optionnel" value={config.freeFromDays || ""} onChange={e => {
+                                              const newConfig = { ...(form.airportDeliveries || {}) };
+                                              newConfig[airport] = { ...config, freeFromDays: e.target.value };
+                                              set("airportDeliveries", newConfig);
+                                            }} style={{ fontSize: 13, padding: 8 }} />
+                                          </div>
                                         </div>
-                                        <div>
-                                          <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>🎁 Gratuit à partir de (jours)</label>
-                                          <input className="input" type="number" placeholder="Optionnel" value={config.freeFromDays || ""} onChange={e => {
-                                            const newConfig = { ...(form.airportDeliveries || {}) };
-                                            newConfig[airport] = { ...config, freeFromDays: e.target.value };
-                                            set("airportDeliveries", newConfig);
-                                          }} style={{ fontSize: 13, padding: 8 }} />
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
                           );
                         })()}
 
