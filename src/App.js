@@ -1498,6 +1498,9 @@ const TRANSLATIONS = {
   my_balance: { fr: "Mon solde", en: "My balance", ar: "رصيدي" },
   new_listing: { fr: "Nouvelle annonce", en: "New listing", ar: "إعلان جديد" },
   received: { fr: "Reçues", en: "Received", ar: "المستلمة" },
+  resa_all: { fr: "Toutes", en: "All", ar: "الكل" },
+  resa_pending: { fr: "En attente", en: "Pending", ar: "قيد الانتظار" },
+  resa_confirmed: { fr: "Confirmées", en: "Confirmed", ar: "مؤكدة" },
   my_bookings: { fr: "Mes réservations", en: "My bookings", ar: "حجوزاتي" },
   // Boutons généraux
   btn_book: { fr: "Réserver", en: "Book", ar: "احجز" },
@@ -4570,7 +4573,16 @@ function Stars({ value, size = 16, onChange = null }) {
 function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings, setModal, reviews, user, confirmExchange, requestPayout, payouts, debtPayments, setPage, t }) {
   const tr = t || ((k) => k);
   const [tab, setTab] = useState("listings");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | pending | confirmed
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
+
+  // Filtrer une liste de réservations selon le filtre choisi
+  // En attente = clés pas encore remises des 2 côtés · Confirmée = échange validé des 2 côtés
+  const applyStatusFilter = (list) => {
+    if (statusFilter === "pending") return list.filter(b => !(b.ownerConfirmed && b.renterConfirmed));
+    if (statusFilter === "confirmed") return list.filter(b => b.ownerConfirmed && b.renterConfirmed);
+    return list;
+  };
 
   // Trouver les réservations terminées (date départ passée) où l'user n'a pas encore noté
   const today = new Date(); today.setHours(0,0,0,0);
@@ -4642,10 +4654,10 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
           );
           const pendingAmount = pendingReservations.reduce((s, b) => s + (b.ownerEarnings || 0), 0);
           return (
-            <div className="card" style={{ padding: 22, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", border: "none" }}>
+            <div className="card" onClick={() => { setTab("received"); setStatusFilter("pending"); }} style={{ padding: 22, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", border: "none", cursor: "pointer" }}>
               <div style={{ fontSize: 13, opacity: 0.9 }}>⏳ Réservations en attente</div>
               <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{pendingAmount.toFixed(2)}€</div>
-              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>{pendingReservations.length} en cours (clés non remises)</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>{pendingReservations.length} en cours (clés non remises) · 👆 voir</div>
             </div>
           );
         })()}
@@ -4687,6 +4699,17 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
         <button className="btn btn-primary" style={{ marginLeft: "auto" }} onClick={() => setModal({ type: "add" })}>+ {tr("new_listing")}</button>
       </div>
 
+      {/* 🔎 FILTRE PAR STATUT (visible pour Reçues et Mes réservations) */}
+      {(tab === "received" || tab === "bookings") && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {[["all", tr("resa_all")], ["pending", tr("resa_pending")], ["confirmed", tr("resa_confirmed")]].map(([key, label]) => (
+            <button key={key} onClick={() => setStatusFilter(key)} className={`pill ${statusFilter === key ? "active" : ""}`} style={{ fontSize: 13 }}>
+              {key === "pending" ? "⏳ " : key === "confirmed" ? "✅ " : "📋 "}{label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {tab === "listings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {myListings.length === 0 ? <Empty icon="📋" msg="Aucune annonce" /> : myListings.map(l => {
@@ -4714,7 +4737,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
 
       {tab === "received" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {bookingsOnMyListings.length === 0 ? <Empty icon="📥" msg="Aucune réservation reçue" /> : [...bookingsOnMyListings].sort((a, b) => {
+          {applyStatusFilter(bookingsOnMyListings).length === 0 ? <Empty icon="📥" msg={statusFilter === "all" ? "Aucune réservation reçue" : statusFilter === "pending" ? "Aucune réservation en attente" : "Aucune réservation confirmée"} /> : [...applyStatusFilter(bookingsOnMyListings)].sort((a, b) => {
             const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
             const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
             return dateB - dateA; // plus récent en haut
@@ -4780,7 +4803,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
 
       {tab === "bookings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {myBookingsAsRenter.length === 0 ? <Empty icon="🎫" msg="Aucune réservation" /> : [...myBookingsAsRenter].sort((a, b) => {
+          {applyStatusFilter(myBookingsAsRenter).length === 0 ? <Empty icon="🎫" msg={statusFilter === "all" ? "Aucune réservation" : statusFilter === "pending" ? "Aucune réservation en attente" : "Aucune réservation confirmée"} /> : [...applyStatusFilter(myBookingsAsRenter)].sort((a, b) => {
             const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
             const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
             return dateB - dateA;
