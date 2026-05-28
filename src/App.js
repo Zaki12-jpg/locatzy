@@ -1407,6 +1407,23 @@ const getTypeInfo = (type) => PROPERTY_TYPES[type] || CUSTOM_LODGING_CACHE[type]
 const isLodging = (type) => getTypeInfo(type)?.category === "lodging";
 const isVehicle = (type) => getTypeInfo(type)?.category === "vehicle";
 
+// 🔗 Transformer un titre en "slug" propre pour les liens : "Audi A3 Sportback" → "audi-a3-sportback"
+function makeSlug(text) {
+  return (text || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // enlève les accents
+    .replace(/[^a-z0-9]+/g, "-") // remplace tout sauf lettres/chiffres par -
+    .replace(/^-+|-+$/g, "") // enlève les - au début et à la fin
+    .slice(0, 50); // limite la longueur
+}
+
+// 📱 Détecter si on est dans l'application mobile (Capacitor) ou sur le site web
+function isNativeApp() {
+  // Capacitor injecte cet objet uniquement dans l'app mobile
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+
 // ════════════════════════════════════════════════════════════════════
 // 🌍 SYSTÈME MULTILINGUE (Français / English / العربية)
 // ════════════════════════════════════════════════════════════════════
@@ -1912,10 +1929,17 @@ export default function App() {
     }
   }, [listings, user]);
 
-  // 🔗 Détecter un lien partagé (?annonce=ID) et ouvrir l'annonce automatiquement
+  // 🔗 Détecter un lien partagé et ouvrir l'annonce automatiquement
+  // Formats supportés : ?a=audi-a3-142 (nouveau) OU ?annonce=142 (ancien)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const annonceId = params.get("annonce");
+    let annonceId = params.get("annonce"); // ancien format
+    const aParam = params.get("a"); // nouveau format : audi-a3-142
+    if (aParam) {
+      // L'ID est le dernier morceau après le dernier tiret
+      const parts = aParam.split("-");
+      annonceId = parts[parts.length - 1];
+    }
     if (!annonceId) return;
     // Attendre que les annonces soient chargées
     if (listings.length === 0) return;
@@ -1924,7 +1948,7 @@ export default function App() {
       setSelectedListing(listing);
       setPage("detail");
     }
-    // Nettoyer l'URL (enlever ?annonce=... pour ne pas réouvrir en boucle)
+    // Nettoyer l'URL pour ne pas réouvrir en boucle
     const cleanUrl = window.location.origin + window.location.pathname;
     window.history.replaceState({}, "", cleanUrl);
   }, [listings]);
@@ -1939,9 +1963,10 @@ export default function App() {
   // 🔗 Partager une annonce (menu natif du téléphone OU copie du lien)
   const shareListing = async (listing) => {
     if (!listing) return;
-    // Construire le lien vers l'annonce
+    // Construire le lien vers l'annonce avec le nom dedans : ?a=audi-a3-142
     const baseUrl = window.location.origin + window.location.pathname;
-    const url = `${baseUrl}?annonce=${listing.id}`;
+    const slug = makeSlug(listing.title);
+    const url = `${baseUrl}?a=${slug}-${listing.id}`;
     const typeIcon = getTypeInfo(listing.type)?.icon || "🏠";
     const shareText = `${typeIcon} ${listing.title} — ${listing.price}€${isLodging(listing.type) ? "/nuit" : "/jour"} à ${listing.city}, ${listing.country}\n\nDécouvrez cette annonce sur Locatzy 👇`;
     // 📱 Si le menu de partage natif est dispo (téléphone), l'utiliser
@@ -3537,7 +3562,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 14, borderTop: "1px solid #f0f0f0", gap: 8 }} onClick={e => e.stopPropagation()}>
           <span style={{ fontSize: 12, color: "#6b7280", flex: 1 }}>{tr("by")} <strong onClick={(e) => { e.stopPropagation(); if (openOwner) openOwner(l.ownerId); }} style={{ color: "#14b8a6", cursor: "pointer", textDecoration: "underline" }}>{l.ownerName}</strong></span>
           <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 12 }} onClick={onContact}>💬</button>
-          <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 12 }} onClick={(e) => { e.stopPropagation(); shareListing && shareListing(l); }} title={tr("share")}>🔗</button>
+          {isNativeApp() && <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 12 }} onClick={(e) => { e.stopPropagation(); shareListing && shareListing(l); }} title={tr("share")}>🔗</button>}
           <button className="btn btn-primary" style={{ padding: "9px 16px", fontSize: 13 }} onClick={onBook}>{tr("btn_book")}</button>
         </div>
       </div>
@@ -3703,7 +3728,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
           )}
           <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 {tr("book_now")}</button>
           <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={() => user ? setModal({ type: "contactOwner", data: l }) : setModal({ type: "login" })}>💬 {tr("contact_owner")}</button>
-          <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14, marginTop: 8, border: "1.5px solid #14b8a6", color: "#0d9488" }} onClick={() => shareListing && shareListing(l)}>🔗 {tr("share")}</button>
+          {isNativeApp() && <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14, marginTop: 8, border: "1.5px solid #14b8a6", color: "#0d9488" }} onClick={() => shareListing && shareListing(l)}>🔗 {tr("share")}</button>}
           <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10 }}>🛡 {tr("pay_nothing_now")} · {tr("secured_by")}</p>
         </div>
       </div>
