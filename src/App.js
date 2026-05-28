@@ -4574,6 +4574,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
   const tr = t || ((k) => k);
   const [tab, setTab] = useState("listings");
   const [statusFilter, setStatusFilter] = useState("all"); // all | pending | confirmed
+  const reservationsRef = useRef(null); // pour faire défiler vers les réservations
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
 
   // Filtrer une liste de réservations selon le filtre choisi
@@ -4654,7 +4655,12 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
           );
           const pendingAmount = pendingReservations.reduce((s, b) => s + (b.ownerEarnings || 0), 0);
           return (
-            <div className="card" onClick={() => { setTab("received"); setStatusFilter("pending"); }} style={{ padding: 22, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", border: "none", cursor: "pointer" }}>
+            <div className="card" onClick={() => {
+              setTab("received");
+              setStatusFilter("pending");
+              // Faire défiler vers les réservations après un court instant (le temps que l'onglet s'affiche)
+              setTimeout(() => { if (reservationsRef.current) reservationsRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
+            }} style={{ padding: 22, background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "white", border: "none", cursor: "pointer" }}>
               <div style={{ fontSize: 13, opacity: 0.9 }}>⏳ Réservations en attente</div>
               <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{pendingAmount.toFixed(2)}€</div>
               <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>{pendingReservations.length} en cours (clés non remises) · 👆 voir</div>
@@ -4692,7 +4698,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+      <div ref={reservationsRef} style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
         <button className={`pill ${tab === "listings" ? "active" : ""}`} onClick={() => setTab("listings")}>📋 {tr("my_listings")} ({myListings.length})</button>
         <button className={`pill ${tab === "received" ? "active" : ""}`} onClick={() => setTab("received")}>📥 {tr("received")} ({bookingsOnMyListings.length})</button>
         <button className={`pill ${tab === "bookings" ? "active" : ""}`} onClick={() => setTab("bookings")}>🎫 {tr("my_bookings")} ({myBookingsAsRenter.length})</button>
@@ -4949,7 +4955,11 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
           <div className="card" style={{ padding: 24 }}>
             <h3 style={{ fontWeight: 700, marginBottom: 16 }}>🔥 Dernières réservations</h3>
-            {bookings.slice(-5).reverse().map(b => (
+            {[...bookings].sort((a, b) => {
+              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
+              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+              return dateB - dateA; // plus récente en premier
+            }).slice(0, 5).map(b => (
               <div key={b.id} style={{ padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <strong style={{ fontSize: 14 }}>{b.listingTitle}</strong>
@@ -5003,7 +5013,11 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
             <p style={{ fontSize: 13, opacity: 0.9 }}>sur {bookings.length} réservation{bookings.length !== 1 ? "s" : ""}</p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {bookings.length === 0 ? <Empty icon="💰" msg="Aucune réservation" /> : [...bookings].reverse().map(b => (
+            {bookings.length === 0 ? <Empty icon="💰" msg="Aucune réservation" /> : [...bookings].sort((a, b) => {
+              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || 0);
+              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || 0);
+              return dateB - dateA; // plus récente en premier
+            }).map(b => (
               <div key={b.id} className="card" style={{ padding: 20 }}>
                 <h4 style={{ fontWeight: 700, marginBottom: 8 }}>{getTypeInfo(b.listingType) && getTypeInfo(b.listingType).icon || "🏠"} {b.listingTitle}</h4>
                 <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>📅 {b.from} → {b.to} · {b.renterName} → {b.ownerName}</p>
