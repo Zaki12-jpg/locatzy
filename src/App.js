@@ -2715,7 +2715,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} t={t} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -4482,8 +4482,9 @@ function SearchableSelect({ options, value, onChange, placeholder = "— Choisir
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry, t }) {
   const [form, setForm] = useState({});
+  const tr = t || ((k) => k);
   const [photos, setPhotos] = useState([]);
   const [formError, setFormError] = useState("");
   const set = (k, v) => { setFormError(""); setForm(f => ({ ...f, [k]: v })); };
@@ -5138,15 +5139,15 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
             <>
               {/* Indicateur d'étapes */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 20, fontSize: 11 }}>
-                <span style={{ background: "#d1fae5", color: "#065f46", padding: "4px 10px", borderRadius: 50, fontWeight: 700 }}>1 ✓ Dates</span>
+                <span style={{ background: "#d1fae5", color: "#065f46", padding: "4px 10px", borderRadius: 50, fontWeight: 700 }}>1 ✓ {tr("step_dates")}</span>
                 <span style={{ color: "#d1d5db" }}>→</span>
-                <span style={{ background: "#14b8a6", color: "white", padding: "4px 10px", borderRadius: 50, fontWeight: 700 }}>2 Infos</span>
+                <span style={{ background: "#14b8a6", color: "white", padding: "4px 10px", borderRadius: 50, fontWeight: 700 }}>2 {tr("step_info")}</span>
                 <span style={{ color: "#d1d5db" }}>→</span>
-                <span style={{ background: "#f3f4f6", color: "#9ca3af", padding: "4px 10px", borderRadius: 50, fontWeight: 700 }}>3 Paiement</span>
+                <span style={{ background: "#f3f4f6", color: "#9ca3af", padding: "4px 10px", borderRadius: 50, fontWeight: 700 }}>3 {tr("step_payment")}</span>
               </div>
 
-              <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 4 }}>📝 Vos informations</h2>
-              <p style={{ color: "#6b7280", marginBottom: 16, fontSize: 13 }}>Vérifiez vos informations pour la réservation.</p>
+              <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 4 }}>📝 {tr("your_info")}</h2>
+              <p style={{ color: "#6b7280", marginBottom: 16, fontSize: 13 }}>{tr("your_info_sub")}</p>
 
               {/* Récap réservation */}
               <div style={{ background: "#f9fafb", borderRadius: 12, padding: 14, marginBottom: 18 }}>
@@ -5173,7 +5174,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 {/* ✈️ CHOIX DE LIVRAISON (véhicules) */}
                 {isVehicle(listing.type) && (listing.deliveryCity || listing.deliveryAirportEnabled) && (
                   <div style={{ background: "#f0fdfa", border: "2px solid #99f6e4", borderRadius: 12, padding: 12 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700, display: "block", marginBottom: 8, color: "#0d9488" }}>🚗 Où voulez-vous récupérer le véhicule ? *</label>
+                    <label style={{ fontSize: 13, fontWeight: 700, display: "block", marginBottom: 8, color: "#0d9488" }}>🚗 {tr("where_pickup")} *</label>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, background: deliveryChoice === "garage" ? "white" : "transparent", border: deliveryChoice === "garage" ? "2px solid #14b8a6" : "2px solid #e5e7eb", borderRadius: 10, cursor: "pointer" }}>
                         <input type="radio" name="delivery" checked={deliveryChoice === "garage"} onChange={() => set("deliveryChoice", "garage")} />
@@ -5222,37 +5223,37 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   </div>
                 )}
 
-                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Nom complet *</label>
-                  <input className="input" placeholder="Votre nom et prénom" value={form.fullName || ""} onChange={e => set("fullName", e.target.value)} /></div>
-                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📧 Email *</label>
+                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{tr("full_name")} *</label>
+                  <input className="input" placeholder={tr("full_name")} value={form.fullName || ""} onChange={e => set("fullName", e.target.value)} /></div>
+                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📧 {tr("email")} *</label>
                   <input className="input" type="email" placeholder="votre@email.com" value={form.bookingEmail || ""} onChange={e => set("bookingEmail", e.target.value)} /></div>
-                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📱 Téléphone *</label>
-                  <input className="input" type="tel" placeholder="+33 6 12 34 56 78" value={form.phone || ""} onChange={e => set("phone", e.target.value)} /></div>
+                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📱 {tr("phone")} *</label>
+                  <input className="input" type="tel" placeholder="+212 6 12 34 56 78" value={form.phone || ""} onChange={e => set("phone", e.target.value)} /></div>
                 {isLodging(listing.type) && (
-                  <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>👥 Nombre de personnes * {listing.guests ? `(max ${listing.guests})` : ""}</label>
+                  <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>👥 {tr("num_people")} * {listing.guests ? `(max ${listing.guests})` : ""}</label>
                     <input className="input" type="number" min={1} max={listing.guests || undefined} placeholder="2" value={form.guestsCount || ""} onChange={e => set("guestsCount", parseInt(e.target.value) || "")} />
                     {listing.guests > 0 && form.guestsCount > listing.guests && (
-                      <p style={{ fontSize: 12, color: "#991b1b", marginTop: 6, fontWeight: 600 }}>⚠️ Ce logement accueille au maximum {listing.guests} personnes.</p>
+                      <p style={{ fontSize: 12, color: "#991b1b", marginTop: 6, fontWeight: 600 }}>⚠️ Max {listing.guests}</p>
                     )}
                   </div>
                 )}
-                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>🆔 Pièce d'identité *</label>
+                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>🆔 {tr("id_document")} *</label>
                   <select className="input" value={form.idType || ""} onChange={e => set("idType", e.target.value)}>
-                    <option value="">— Choisir —</option>
-                    <option value="cni">Carte d'identité</option>
-                    <option value="passport">Passeport</option>
-                    <option value="driver">Permis de conduire</option>
+                    <option value="">—</option>
+                    <option value="cni">{tr("id_document")}</option>
+                    <option value="passport">Passport</option>
+                    <option value="driver">Permis / License</option>
                   </select>
                 </div>
-                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Numéro de la pièce *</label>
-                  <input className="input" placeholder="Ex : 1234567890" value={form.idNumber || ""} onChange={e => set("idNumber", e.target.value)} /></div>
-                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>💬 Message au propriétaire (optionnel)</label>
-                  <textarea className="input" rows={2} placeholder="Heure d'arrivée prévue, demande spéciale…" value={form.bookingNote || ""} onChange={e => set("bookingNote", e.target.value)} style={{ resize: "vertical" }} /></div>
+                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{tr("id_number")} *</label>
+                  <input className="input" placeholder="1234567890" value={form.idNumber || ""} onChange={e => set("idNumber", e.target.value)} /></div>
+                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>💬 {tr("message_to_owner")}</label>
+                  <textarea className="input" rows={2} value={form.bookingNote || ""} onChange={e => set("bookingNote", e.target.value)} style={{ resize: "vertical" }} /></div>
 
                 {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
 
                 <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModal({ type: "book", data: listing })}>← Retour</button>
+                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModal({ type: "book", data: listing })}>← {tr("btn_back")}</button>
                   <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => {
                     if (!form.fullName || !form.fullName.trim()) return setFormError("Nom obligatoire");
                     if (!form.bookingEmail || !form.bookingEmail.trim()) return setFormError("Email obligatoire");
@@ -5269,7 +5270,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                     }
                     setFormError("");
                     setModal({ type: "bookingPayment", data: { listing, from, to, info: { fullName: form.fullName, email: form.bookingEmail, phone: form.phone, guestsCount: isLodging(listing.type) ? form.guestsCount : null, idType: form.idType, idNumber: form.idNumber, note: form.bookingNote || "", deliveryChoice: deliveryChoice, deliveryFee: deliveryFee, deliveryLabel: deliveryLabel, arrivalTime: form.arrivalTime || "" } } });
-                  }}>Continuer →</button>
+                  }}>{tr("btn_continue")} →</button>
                 </div>
               </div>
             </>
