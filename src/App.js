@@ -2715,10 +2715,10 @@ export default function App() {
         <button className="nav-btn mobile-only" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 {t("nav_explore")}</button>
       </nav>
 
-      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} />}
+      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} t={t} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
-      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} />}
+      {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} t={t} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
@@ -2889,7 +2889,8 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
 }
 
 // ─── HOME ────────────────────────────────────────────────────────────
-function Home({ listings, filter, setFilter, country, setCountry, countries, search, setSearch, setModal, openDetail, openOwner, dateFrom, setDateFrom, dateTo, setDateTo, user, onToggleFav, priceMin, setPriceMin, priceMax, setPriceMax, minRooms, setMinRooms, minGuests, setMinGuests, minRating, setMinRating, wifiOnly, setWifiOnly, fuelFilter, setFuelFilter, transFilter, setTransFilter, vehicleBodyFilter, setVehicleBodyFilter }) {
+function Home({ listings, filter, setFilter, country, setCountry, countries, search, setSearch, setModal, openDetail, openOwner, dateFrom, setDateFrom, dateTo, setDateTo, user, onToggleFav, priceMin, setPriceMin, priceMax, setPriceMax, minRooms, setMinRooms, minGuests, setMinGuests, minRating, setMinRating, wifiOnly, setWifiOnly, fuelFilter, setFuelFilter, transFilter, setTransFilter, vehicleBodyFilter, setVehicleBodyFilter, t }) {
+  const tr = t || ((k) => k); // sécurité si t absent
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [selectedDropdownCountry, setSelectedDropdownCountry] = useState("");
   const [lodgingDropdownOpen, setLodgingDropdownOpen] = useState(false);
@@ -2904,7 +2905,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
           <h1 className="display" style={{ fontSize: 30, fontWeight: 800, color: "white", lineHeight: 1.1, marginBottom: 12, letterSpacing: -0.5 }}>Louez n'importe où.<br /><em style={{ color: "#14b8a6", fontStyle: "italic", fontSize: 26 }}>Partout dans le monde.</em></h1>
           <p style={{ color: "#a3a3a3", fontSize: 13, marginBottom: 22 }}>Appartements & voitures entre particuliers</p>
           <div style={{ background: "white", borderRadius: 50, padding: 5, display: "flex", gap: 5, marginBottom: 10, boxShadow: "0 15px 35px rgba(0,0,0,0.4)" }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pays, ville…" style={{ flex: 1, border: "none", outline: "none", padding: "10px 14px", fontSize: 13, background: "transparent" }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr("search_placeholder")} style={{ flex: 1, border: "none", outline: "none", padding: "10px 14px", fontSize: 13, background: "transparent" }} />
             <button className="btn btn-accent" style={{ borderRadius: 50, padding: "8px 18px", fontSize: 13 }}>🔍</button>
           </div>
           {/* Sélection des dates */}
@@ -2943,7 +2944,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
               {country === "all" ? "🌍 Pays" : country} ▾
             </button>
             <button className={`pill ${(priceMin || priceMax || minRooms || minGuests || minRating > 0 || wifiOnly || fuelFilter || transFilter || vehicleBodyFilter) ? "active" : ""}`} onClick={() => setAdvancedDropdownOpen(!advancedDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
-              ⚙️ Filtres {(() => {
+              ⚙️ {tr("filters")} {(() => {
                 const count = [priceMin, priceMax, minRooms, minGuests, minRating > 0, wifiOnly, fuelFilter, transFilter, vehicleBodyFilter].filter(Boolean).length;
                 return count > 0 ? `(${count})` : "";
               })()} ▾
@@ -2958,7 +2959,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
           <div onClick={() => setAdvancedDropdownOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 80 }} />
           <div style={{ position: "fixed", bottom: 70, left: "50%", transform: "translateX(-50%)", width: "calc(100% - 32px)", maxWidth: 400, maxHeight: "75vh", background: "white", borderRadius: 20, boxShadow: "0 -10px 40px rgba(0,0,0,0.2)", zIndex: 85, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "14px 18px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ fontWeight: 800, fontSize: 16 }}>⚙️ Filtres avancés</h3>
+              <h3 style={{ fontWeight: 800, fontSize: 16 }}>⚙️ {tr("filters")}</h3>
               <button onClick={() => setAdvancedDropdownOpen(false)} style={{ background: "#f3f4f6", borderRadius: "50%", width: 30, height: 30, fontSize: 16 }}>×</button>
             </div>
             <div style={{ overflowY: "auto", flex: 1, padding: 18 }}>
@@ -3056,8 +3057,8 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
               <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
                 <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => {
                   setPriceMin(""); setPriceMax(""); setMinRooms(""); setMinGuests(""); setMinRating(0); setWifiOnly(false); setFuelFilter(""); setTransFilter(""); setVehicleBodyFilter("");
-                }}>Réinitialiser</button>
-                <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setAdvancedDropdownOpen(false)}>Appliquer ({listings.length} résultats)</button>
+                }}>{tr("reset")}</button>
+                <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setAdvancedDropdownOpen(false)}>{tr("apply")} ({listings.length})</button>
               </div>
             </div>
           </div>
@@ -3837,7 +3838,8 @@ function Stars({ value, size = 16, onChange = null }) {
 }
 
 // ─── MY PAGE ─────────────────────────────────────────────────────────
-function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings, setModal, reviews, user, confirmExchange, requestPayout, payouts, debtPayments, setPage }) {
+function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings, setModal, reviews, user, confirmExchange, requestPayout, payouts, debtPayments, setPage, t }) {
+  const tr = t || ((k) => k);
   const [tab, setTab] = useState("listings");
   const totalEarnings = bookingsOnMyListings.reduce((s, b) => s + b.ownerEarnings, 0);
 
@@ -3852,16 +3854,16 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
 
   return (
     <div style={{ padding: "16px" }}>
-      <h2 className="display" style={{ fontSize: 26, fontWeight: 800, marginBottom: 8 }}>Mon espace</h2>
-      <p style={{ color: "#6b7280", marginBottom: 28 }}>Gérez vos annonces, vos réservations et suivez vos gains.</p>
+      <h2 className="display" style={{ fontSize: 26, fontWeight: 800, marginBottom: 8 }}>{tr("my_space")}</h2>
+      <p style={{ color: "#6b7280", marginBottom: 28 }}>{tr("my_space_sub")}</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 28 }}>
-        <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📋 Mes annonces</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{myListings.length}</div></div>
-        <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📅 Réservations reçues</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{bookingsOnMyListings.length}</div></div>
+        <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📋 {tr("my_listings")}</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{myListings.length}</div></div>
+        <div className="card" style={{ padding: 22 }}><div style={{ fontSize: 13, color: "#6b7280" }}>📅 {tr("received_bookings")}</div><div className="display" style={{ fontSize: 32, fontWeight: 800 }}>{bookingsOnMyListings.length}</div></div>
 
         {/* 💰 Mes gains (total cumulé depuis le début) */}
         <div className="card" style={{ padding: 22, background: "linear-gradient(135deg,#14b8a6,#0d9488)", color: "white", border: "none" }}>
-          <div style={{ fontSize: 13, opacity: 0.9 }}>💰 Mes gains</div>
+          <div style={{ fontSize: 13, opacity: 0.9 }}>💰 {tr("my_earnings")}</div>
           <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{totalEarnings.toFixed(2)}€</div>
           <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>Total cumulé depuis le début</div>
         </div>
@@ -3884,7 +3886,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
           return (
             <div className="card" style={{ padding: 22, background: bg, color: "white", border: "none" }}>
               <div onClick={() => setModal({ type: "balanceDetail" })} style={{ cursor: "pointer" }}>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>{isDeactivated ? "🚫 Compte désactivé" : "💼 Mon solde"}</div>
+                <div style={{ fontSize: 13, opacity: 0.9 }}>{isDeactivated ? "🚫 Compte désactivé" : `💼 ${tr("my_balance")}`}</div>
                 <div className="display" style={{ fontSize: 28, fontWeight: 800 }}>{isPositive ? "+" : ""}{balance}€</div>
                 <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4 }}>Disponible au retrait</div>
                 {isDeactivated && (
@@ -3950,10 +3952,10 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
       )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        <button className={`pill ${tab === "listings" ? "active" : ""}`} onClick={() => setTab("listings")}>📋 Mes annonces ({myListings.length})</button>
-        <button className={`pill ${tab === "received" ? "active" : ""}`} onClick={() => setTab("received")}>📥 Reçues ({bookingsOnMyListings.length})</button>
-        <button className={`pill ${tab === "bookings" ? "active" : ""}`} onClick={() => setTab("bookings")}>🎫 Mes réservations ({myBookingsAsRenter.length})</button>
-        <button className="btn btn-primary" style={{ marginLeft: "auto" }} onClick={() => setModal({ type: "add" })}>+ Nouvelle annonce</button>
+        <button className={`pill ${tab === "listings" ? "active" : ""}`} onClick={() => setTab("listings")}>📋 {tr("my_listings")} ({myListings.length})</button>
+        <button className={`pill ${tab === "received" ? "active" : ""}`} onClick={() => setTab("received")}>📥 {tr("received")} ({bookingsOnMyListings.length})</button>
+        <button className={`pill ${tab === "bookings" ? "active" : ""}`} onClick={() => setTab("bookings")}>🎫 {tr("my_bookings")} ({myBookingsAsRenter.length})</button>
+        <button className="btn btn-primary" style={{ marginLeft: "auto" }} onClick={() => setModal({ type: "add" })}>+ {tr("new_listing")}</button>
       </div>
 
       {tab === "listings" && (
