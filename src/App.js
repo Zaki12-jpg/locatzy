@@ -1528,6 +1528,33 @@ const TRANSLATIONS = {
   status_pending: { fr: "En attente", en: "Pending", ar: "قيد الانتظار" },
   status_approved: { fr: "Approuvée", en: "Approved", ar: "تمت الموافقة" },
   status_confirmed: { fr: "Confirmée", en: "Confirmed", ar: "مؤكد" },
+  // Hero accueil
+  hero_title: { fr: "Louez n'importe où.", en: "Rent anywhere.", ar: "استأجر في أي مكان." },
+  hero_subtitle: { fr: "Partout dans le monde.", en: "All around the world.", ar: "في جميع أنحاء العالم." },
+  hero_tagline: { fr: "Appartements & voitures entre particuliers", en: "Apartments & cars between individuals", ar: "شقق وسيارات بين الأفراد" },
+  available_worldwide: { fr: "Disponible dans le monde entier", en: "Available worldwide", ar: "متاح في جميع أنحاء العالم" },
+  publish_listing: { fr: "Publier mon annonce", en: "Publish my listing", ar: "نشر إعلاني" },
+  start_date: { fr: "Départ", en: "Start date", ar: "تاريخ البدء" },
+  end_date: { fr: "Retour", en: "End date", ar: "تاريخ العودة" },
+  lodgings: { fr: "Logements", en: "Lodgings", ar: "السكن" },
+  vehicles: { fr: "Véhicules", en: "Vehicles", ar: "المركبات" },
+  countries: { fr: "Pays", en: "Countries", ar: "الدول" },
+  by: { fr: "Par", en: "By", ar: "بواسطة" },
+  // Réservation (carte détail)
+  book_now: { fr: "Réserver maintenant", en: "Book now", ar: "احجز الآن" },
+  pay_nothing_now: { fr: "Vous ne paierez rien maintenant", en: "You won't pay anything now", ar: "لن تدفع شيئًا الآن" },
+  secured_by: { fr: "Sécurisé par Locatzy", en: "Secured by Locatzy", ar: "مؤمّن من Locatzy" },
+  // Détail bien
+  about_property: { fr: "À propos de ce bien", en: "About this property", ar: "حول هذا العقار" },
+  what_offers: { fr: "Ce que propose ce bien", en: "What this property offers", ar: "ما يقدمه هذا العقار" },
+  address_after_booking: { fr: "L'adresse exacte sera communiquée après réservation", en: "The exact address will be shared after booking", ar: "سيتم تقديم العنوان الدقيق بعد الحجز" },
+  rooms_count: { fr: "chambres", en: "rooms", ar: "غرف" },
+  up_to: { fr: "Jusqu'à", en: "Up to", ar: "حتى" },
+  people: { fr: "personnes", en: "people", ar: "أشخاص" },
+  people_max: { fr: "personnes max", en: "people max", ar: "أشخاص كحد أقصى" },
+  wifi_included: { fr: "WiFi inclus", en: "WiFi included", ar: "واي فاي مشمول" },
+  per_night: { fr: "/ nuit", en: "/ night", ar: "/ ليلة" },
+  seats_label: { fr: "places", en: "seats", ar: "مقاعد" },
 };
 
 // Helper de traduction global (utilisé par la fonction t() dans App)
@@ -2784,13 +2811,13 @@ export default function App() {
 
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} t={t} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} t={t} />}
-      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
+      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} t={t} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} t={t} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} t={t} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} t={t} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
-      {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} /> }
+      {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} t={t} /> }
 
       {/* BOTTOM NAV FIXED - Mobile uniquement */}
       <div className="bottom-nav" style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
@@ -2820,7 +2847,7 @@ function BottomBtn({ icon, label, active, onClick, badge, accent, darkMode }) {
   );
 }
 
-function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggleFav, setModal, openOwner }) {
+function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggleFav, setModal, openOwner, t }) {
   // Mes favoris : annonces que j'ai aimées et qui sont approuvées
   const myFavIds = favorites.filter(f => f.userId === user.id).map(f => f.listingId);
   const favListings = listings.filter(l => myFavIds.includes(l.id) && l.status === "approved");
@@ -2839,7 +2866,7 @@ function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggl
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {favListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} />)}
+          {favListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={t} />)}
         </div>
       )}
     </div>
@@ -2968,23 +2995,23 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
       <div className="hero-section" style={{ background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)", padding: "32px 20px 50px", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: -80, right: -80, width: 240, height: 240, borderRadius: "50%", background: "radial-gradient(circle, #14b8a6 0%, transparent 70%)", opacity: 0.4 }} />
         <div style={{ position: "relative", textAlign: "center" }}>
-          <div style={{ display: "inline-block", background: "rgba(20,184,166,0.15)", color: "#5eead4", padding: "5px 12px", borderRadius: 50, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>🌍 Disponible dans le monde entier</div>
-          <h1 className="display" style={{ fontSize: 30, fontWeight: 800, color: "white", lineHeight: 1.1, marginBottom: 12, letterSpacing: -0.5 }}>Louez n'importe où.<br /><em style={{ color: "#14b8a6", fontStyle: "italic", fontSize: 26 }}>Partout dans le monde.</em></h1>
-          <p style={{ color: "#a3a3a3", fontSize: 13, marginBottom: 22 }}>Appartements & voitures entre particuliers</p>
+          <div style={{ display: "inline-block", background: "rgba(20,184,166,0.15)", color: "#5eead4", padding: "5px 12px", borderRadius: 50, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>🌍 {tr("available_worldwide")}</div>
+          <h1 className="display" style={{ fontSize: 30, fontWeight: 800, color: "white", lineHeight: 1.1, marginBottom: 12, letterSpacing: -0.5 }}>{tr("hero_title")}<br /><em style={{ color: "#14b8a6", fontStyle: "italic", fontSize: 26 }}>{tr("hero_subtitle")}</em></h1>
+          <p style={{ color: "#a3a3a3", fontSize: 13, marginBottom: 22 }}>{tr("hero_tagline")}</p>
           <div style={{ background: "white", borderRadius: 50, padding: 5, display: "flex", gap: 5, marginBottom: 10, boxShadow: "0 15px 35px rgba(0,0,0,0.4)" }}>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr("search_placeholder")} style={{ flex: 1, border: "none", outline: "none", padding: "10px 14px", fontSize: 13, background: "transparent" }} />
             <button className="btn btn-accent" style={{ borderRadius: 50, padding: "8px 18px", fontSize: 13 }}>🔍</button>
           </div>
           {/* Sélection des dates */}
           <div style={{ background: "white", borderRadius: 16, padding: 12, marginBottom: 16, boxShadow: "0 10px 25px rgba(0,0,0,0.3)", boxSizing: "border-box" }}>
-            <p style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, letterSpacing: 0.5, marginBottom: 10, textAlign: "left" }}>📅 QUAND VOULEZ-VOUS LOUER ?</p>
+            <p style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, letterSpacing: 0.5, marginBottom: 10, textAlign: "left" }}>📅 {tr("start_date")} — {tr("end_date")}</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div style={{ minWidth: 0 }}>
-                <label style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600, display: "block", marginBottom: 4, textAlign: "left" }}>Arrivée</label>
+                <label style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600, display: "block", marginBottom: 4, textAlign: "left" }}>{tr("start_date")}</label>
                 <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} min={new Date().toISOString().split("T")[0]} style={{ width: "100%", border: "none", outline: "none", padding: "8px 6px", fontSize: 12, background: "#f9fafb", borderRadius: 10, fontFamily: "inherit", boxSizing: "border-box", minWidth: 0 }} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <label style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600, display: "block", marginBottom: 4, textAlign: "left" }}>Départ</label>
+                <label style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600, display: "block", marginBottom: 4, textAlign: "left" }}>{tr("end_date")}</label>
                 <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || new Date().toISOString().split("T")[0]} style={{ width: "100%", border: "none", outline: "none", padding: "8px 6px", fontSize: 12, background: "#f9fafb", borderRadius: 10, fontFamily: "inherit", boxSizing: "border-box", minWidth: 0 }} />
               </div>
             </div>
@@ -2992,7 +3019,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
               <button onClick={() => { setDateFrom(""); setDateTo(""); }} style={{ background: "transparent", color: "#ef4444", fontSize: 11, fontWeight: 600, marginTop: 10, padding: 4 }}>✕ Effacer les dates</button>
             )}
           </div>
-          <button className="btn" style={{ background: "white", color: "#0a0a0a", fontSize: 14, padding: "12px 28px" }} onClick={() => setModal({ type: "add" })}>+ Publier mon annonce</button>
+          <button className="btn" style={{ background: "white", color: "#0a0a0a", fontSize: 14, padding: "12px 28px" }} onClick={() => setModal({ type: "add" })}>+ {tr("publish_listing")}</button>
         </div>
       </div>
 
@@ -3002,13 +3029,13 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
           const isVehicleFilter = filter !== "all" && isVehicle(filter);
           return <>
             <button className={`pill ${isLodgingFilter ? "active" : ""}`} onClick={() => setLodgingDropdownOpen(!lodgingDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
-              {isLodgingFilter ? `${PROPERTY_TYPES[filter].icon} ${PROPERTY_TYPES[filter].labelShort}` : "🏘 Logements"} ▾
+              {isLodgingFilter ? `${PROPERTY_TYPES[filter].icon} ${PROPERTY_TYPES[filter].labelShort}` : `🏘 ${tr("lodgings")}`} ▾
             </button>
             <button className={`pill ${isVehicleFilter ? "active" : ""}`} onClick={() => setVehicleDropdownOpen(!vehicleDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
-              {isVehicleFilter ? `${PROPERTY_TYPES[filter].icon} ${PROPERTY_TYPES[filter].labelShort}` : "🚙 Véhicules"} ▾
+              {isVehicleFilter ? `${PROPERTY_TYPES[filter].icon} ${PROPERTY_TYPES[filter].labelShort}` : `🚙 ${tr("vehicles")}`} ▾
             </button>
             <button className={`pill ${country !== "all" ? "active" : ""}`} onClick={() => setCountryDropdownOpen(!countryDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
-              {country === "all" ? "🌍 Pays" : country} ▾
+              {country === "all" ? `🌍 ${tr("countries")}` : country} ▾
             </button>
             <button className={`pill ${(priceMin || priceMax || minRooms || minGuests || minRating > 0 || wifiOnly || fuelFilter || transFilter || vehicleBodyFilter) ? "active" : ""}`} onClick={() => setAdvancedDropdownOpen(!advancedDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
               ⚙️ {tr("filters")} {(() => {
@@ -3273,7 +3300,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
         )}
         <div className="listings-grid" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {listings.length === 0 ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 60, color: "#9ca3af" }}><div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div><p>{dateFrom && dateTo ? "Aucune annonce disponible à ces dates" : "Aucune annonce trouvée"}</p>{dateFrom && dateTo && <p style={{ fontSize: 12, marginTop: 8 }}>Essayez d'autres dates</p>}</div>
-          : listings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} />)}
+          : listings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={tr} />)}
         </div>
       </div>
     </div>
@@ -3281,7 +3308,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
 }
 
 // ─── OWNER PROFILE PAGE ──────────────────────────────────────────────
-function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage, goBack, openDetail, setModal, onToggleFav, openOwner }) {
+function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage, goBack, openDetail, setModal, onToggleFav, openOwner, t }) {
   const users = DB.get("lcy_users");
   const owner = users.find(u => u.id === ownerId);
   if (!owner) {
@@ -3352,7 +3379,7 @@ function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage,
         <Empty icon="📋" msg="Aucune annonce active" />
       ) : (
         <div className="listings-grid" style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
-          {ownerListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} />)}
+          {ownerListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={t} />)}
         </div>
       )}
 
@@ -3384,7 +3411,8 @@ function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage,
   );
 }
 
-function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav, openOwner }) {
+function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav, openOwner, t }) {
+  const tr = t || ((k) => k);
   const [idx, setIdx] = useState(0);
   const photo = l.photos[idx];
   const isImage = photo && photo.startsWith && photo.startsWith("data:");
@@ -3442,9 +3470,9 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
         <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 12 }}>📍 {l.city} · {isLodging(l.type) ? `🛏 ${l.rooms} ch · 👥 ${l.guests} pers${l.wifi === true ? " · 📶" : l.wifi === false ? " · 🚫📶" : ""}` : `💺 ${l.seats} pl${l.vehicleType ? ` · ${VEHICLE_BODY_LABELS[l.vehicleType] || l.vehicleType}` : ""} · ${FUEL_LABELS[l.fuel] || "⛽"}`}</p>
         <p style={{ color: "#4b5563", fontSize: 13, lineHeight: 1.5, marginBottom: 14, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{l.desc}</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 14, borderTop: "1px solid #f0f0f0", gap: 8 }} onClick={e => e.stopPropagation()}>
-          <span style={{ fontSize: 12, color: "#6b7280", flex: 1 }}>Par <strong onClick={(e) => { e.stopPropagation(); if (openOwner) openOwner(l.ownerId); }} style={{ color: "#14b8a6", cursor: "pointer", textDecoration: "underline" }}>{l.ownerName}</strong></span>
+          <span style={{ fontSize: 12, color: "#6b7280", flex: 1 }}>{tr("by")} <strong onClick={(e) => { e.stopPropagation(); if (openOwner) openOwner(l.ownerId); }} style={{ color: "#14b8a6", cursor: "pointer", textDecoration: "underline" }}>{l.ownerName}</strong></span>
           <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 12 }} onClick={onContact}>💬</button>
-          <button className="btn btn-primary" style={{ padding: "9px 16px", fontSize: 13 }} onClick={onBook}>Réserver</button>
+          <button className="btn btn-primary" style={{ padding: "9px 16px", fontSize: 13 }} onClick={onBook}>{tr("btn_book")}</button>
         </div>
       </div>
     </div>
@@ -3589,7 +3617,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 20, borderBottom: "1px solid #e5e7eb", marginBottom: 24 }}>
           <div>
             <h2 className="display" style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{getTypeInfo(l.type)?.icon} {getTypeInfo(l.type)?.labelFull || l.type}</h2>
-            <p style={{ color: "#6b7280", fontSize: 14 }}>{isLodging(l.type) ? `${l.rooms} chambre${l.rooms > 1 ? "s" : ""} · ${l.guests} personnes max` : `${l.seats} places${l.vehicleType ? ` · ${VEHICLE_BODY_LABELS[l.vehicleType] || l.vehicleType}` : ""}`}</p>
+            <p style={{ color: "#6b7280", fontSize: 14 }}>{isLodging(l.type) ? `${l.rooms} ${tr("rooms_count")} · ${l.guests} ${tr("people_max")}` : `${l.seats} ${tr("seats_label")}${l.vehicleType ? ` · ${VEHICLE_BODY_LABELS[l.vehicleType] || l.vehicleType}` : ""}`}</p>
           </div>
           <div style={{ width: 54, height: 54, borderRadius: "50%", background: "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 22 }}>{l.ownerName[0]}</div>
         </div>
@@ -3607,9 +3635,9 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
               <span style={{ color: "#6b7280" }}>· {rating.count} avis</span>
             </div>
           )}
-          <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 {tr("btn_book")}</button>
+          <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 {tr("book_now")}</button>
           <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={() => user ? setModal({ type: "contactOwner", data: l }) : setModal({ type: "login" })}>💬 {tr("contact_owner")}</button>
-          <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10 }}>🛡 Vous ne paierez rien maintenant · Sécurisé par Locatzy</p>
+          <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10 }}>🛡 {tr("pay_nothing_now")} · {tr("secured_by")}</p>
         </div>
       </div>
       </div>{/* fin detail-top-grid */}
@@ -3619,12 +3647,12 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
         {/* Colonne gauche : infos */}
         <div>
           {/* Description */}
-          <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>À propos de ce bien</h3>
+          <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>{tr("about_property")}</h3>
           <p style={{ color: "#374151", fontSize: 15, lineHeight: 1.7, marginBottom: 24, whiteSpace: "pre-wrap" }}>{l.desc}</p>
 
           {/* 📍 LOCALISATION */}
           <div style={{ background: "linear-gradient(135deg,#f0fdfa,#ccfbf1)", border: "1px solid #99f6e4", borderRadius: 16, padding: 18, marginBottom: 28 }}>
-            <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 6, color: "#0f766e" }}>📍 Localisation</h3>
+            <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 6, color: "#0f766e" }}>📍 {tr("location")}</h3>
             <p style={{ fontSize: 14, color: "#0d9488", marginBottom: l.mapLink ? 12 : 0 }}>{l.city}, {l.country}</p>
             {l.mapLink && (
               <a href={l.mapLink} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#14b8a6", color: "white", padding: "12px 18px", borderRadius: 12, textDecoration: "none", fontWeight: 700, fontSize: 14 }}>
@@ -3632,25 +3660,25 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
               </a>
             )}
             {!l.mapLink && (
-              <p style={{ fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>📌 L'adresse exacte sera communiquée après réservation</p>
+              <p style={{ fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>📌 {tr("address_after_booking")}</p>
             )}
           </div>
 
           {/* Caractéristiques détaillées */}
-          <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Ce que propose ce bien</h3>
+          <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>{tr("what_offers")}</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, marginBottom: 32 }}>
             {isLodging(l.type) ? (
               <>
-                <Feature icon="🛏" label={`${l.rooms} chambre${l.rooms > 1 ? "s" : ""}`} />
-                <Feature icon="👥" label={`Jusqu'à ${l.guests} personnes`} />
-                <Feature icon={l.wifi === true ? "📶" : l.wifi === false ? "🚫" : "📶"} label={l.wifi === true ? "WiFi inclus" : l.wifi === false ? "Pas de WiFi" : "WiFi (à confirmer)"} />
+                <Feature icon="🛏" label={`${l.rooms} ${tr("rooms_count")}`} />
+                <Feature icon="👥" label={`${tr("up_to")} ${l.guests} ${tr("people")}`} />
+                <Feature icon={l.wifi === true ? "📶" : l.wifi === false ? "🚫" : "📶"} label={l.wifi === true ? tr("wifi_included") : l.wifi === false ? "Pas de WiFi / No WiFi" : "WiFi ?"} />
                 <Feature icon={getTypeInfo(l.type)?.icon || "🏠"} label={getTypeInfo(l.type)?.labelFull || "Logement"} />
                 <Feature icon="📍" label={`${l.city}, ${l.country}`} />
-                <Feature icon="💰" label={`${l.price}€ / nuit`} />
+                <Feature icon="💰" label={`${l.price}€ ${tr("per_night")}`} />
               </>
             ) : (
               <>
-                <Feature icon="💺" label={`${l.seats} places`} />
+                <Feature icon="💺" label={`${l.seats} ${tr("seats_label")}`} />
                 {l.vehicleType && <Feature icon="🚙" label={VEHICLE_BODY_LABELS[l.vehicleType] || l.vehicleType} />}
                 <Feature icon="📍" label={`Disponible à ${l.city}`} />
                 <Feature icon="" label={FUEL_LABELS[l.fuel] || "⛽ Carburant non précisé"} />
