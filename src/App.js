@@ -1930,15 +1930,22 @@ export default function App() {
   }, [listings, user]);
 
   // 🔗 Détecter un lien partagé et ouvrir l'annonce automatiquement
-  // Formats supportés : ?a=audi-a3-142 (nouveau) OU ?annonce=142 (ancien)
+  // Formats : /logement/audi-a3/142 (nouveau) · ?a=audi-a3-142 · ?annonce=142 (anciens)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    let annonceId = params.get("annonce"); // ancien format
-    const aParam = params.get("a"); // nouveau format : audi-a3-142
-    if (aParam) {
-      // L'ID est le dernier morceau après le dernier tiret
-      const parts = aParam.split("-");
-      annonceId = parts[parts.length - 1];
+    let annonceId = null;
+    // 1) Nouveau format : chemin /logement/slug/142 ou /vehicule/slug/142
+    const pathMatch = window.location.pathname.match(/\/(logement|vehicule)\/[^/]+\/(\d+)/);
+    if (pathMatch) {
+      annonceId = pathMatch[2]; // l'ID est le nombre à la fin
+    } else {
+      // 2) Anciens formats avec ?
+      const params = new URLSearchParams(window.location.search);
+      annonceId = params.get("annonce");
+      const aParam = params.get("a");
+      if (aParam) {
+        const parts = aParam.split("-");
+        annonceId = parts[parts.length - 1];
+      }
     }
     if (!annonceId) return;
     // Attendre que les annonces soient chargées
@@ -1948,9 +1955,8 @@ export default function App() {
       setSelectedListing(listing);
       setPage("detail");
     }
-    // Nettoyer l'URL pour ne pas réouvrir en boucle
-    const cleanUrl = window.location.origin + window.location.pathname;
-    window.history.replaceState({}, "", cleanUrl);
+    // Nettoyer l'URL pour revenir à la racine (évite de recharger en boucle)
+    window.history.replaceState({}, "", window.location.origin + "/");
   }, [listings]);
 
 
@@ -1960,13 +1966,19 @@ export default function App() {
 
   const flash = (msg, color = "#10b981") => { setToast({ msg, color }); setTimeout(() => setToast(null), 3500); };
 
+  // 🔗 Construire la belle URL d'une annonce : /logement/audi-a3/142
+  const buildListingUrl = (listing) => {
+    const origin = window.location.origin;
+    const cat = isVehicle(listing.type) ? "vehicule" : "logement";
+    const slug = makeSlug(listing.title) || "annonce";
+    return `${origin}/${cat}/${slug}/${listing.id}`;
+  };
+
   // 🔗 Partager une annonce (menu natif du téléphone OU copie du lien)
   const shareListing = async (listing) => {
     if (!listing) return;
-    // Construire le lien vers l'annonce avec le nom dedans : ?a=audi-a3-142
-    const baseUrl = window.location.origin + window.location.pathname;
-    const slug = makeSlug(listing.title);
-    const url = `${baseUrl}?a=${slug}-${listing.id}`;
+    // Belle URL : locatzy.com/logement/audi-a3/142
+    const url = buildListingUrl(listing);
     const typeIcon = getTypeInfo(listing.type)?.icon || "🏠";
     const shareText = `${typeIcon} ${listing.title} — ${listing.price}€${isLodging(listing.type) ? "/nuit" : "/jour"} à ${listing.city}, ${listing.country}\n\nDécouvrez cette annonce sur Locatzy 👇`;
     // 📱 Si le menu de partage natif est dispo (téléphone), l'utiliser
