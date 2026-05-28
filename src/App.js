@@ -261,6 +261,22 @@ function calculateOwnerBalance(ownerId, bookings, payouts, debtPayments) {
 
 // 🎁 Calcul du prix avec offre (si applicable)
 function getPriceWithOffer(listing, days) {
+  // 🎁 Promo à durée limitée prioritaire
+  const promoActive = listing.promoPrice && listing.promoUntil && (() => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const until = new Date(listing.promoUntil); until.setHours(23,59,59,999);
+    return until >= today && Number(listing.promoPrice) > 0 && Number(listing.promoPrice) < Number(listing.price);
+  })();
+  if (promoActive) {
+    return {
+      pricePerDay: Number(listing.promoPrice),
+      total: days * Number(listing.promoPrice),
+      offerApplied: true,
+      promoApplied: true,
+      originalTotal: days * listing.price,
+      saved: days * (listing.price - Number(listing.promoPrice)),
+    };
+  }
   if (listing.offerMinDays && listing.offerPrice && days >= listing.offerMinDays) {
     return {
       pricePerDay: listing.offerPrice,
@@ -275,6 +291,20 @@ function getPriceWithOffer(listing, days) {
     total: days * listing.price,
     offerApplied: false,
   };
+}
+
+// 🎁 Vérifier si une promo à durée limitée est active aujourd'hui
+function isPromoActive(listing) {
+  if (!listing.promoPrice || !listing.promoUntil) return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const until = new Date(listing.promoUntil); until.setHours(23, 59, 59, 999);
+  return until >= today && Number(listing.promoPrice) > 0 && Number(listing.promoPrice) < Number(listing.price);
+}
+
+// 🎁 Prix effectif d'une annonce (promo prioritaire, sinon prix normal)
+function getEffectivePrice(listing) {
+  if (isPromoActive(listing)) return Number(listing.promoPrice);
+  return Number(listing.price);
 }
 
 // ❤️ Favoris helpers
@@ -1616,6 +1646,30 @@ const TRANSLATIONS = {
   report_inappropriate: { fr: "Contenu inapproprié", en: "Inappropriate content", ar: "محتوى غير لائق" },
   report_other: { fr: "Autre raison", en: "Other reason", ar: "سبب آخر" },
   report_sent: { fr: "Merci ! Votre signalement a été envoyé à notre équipe.", en: "Thank you! Your report was sent to our team.", ar: "شكرًا! تم إرسال بلاغك إلى فريقنا." },
+  // Promotions
+  promo: { fr: "Promotion", en: "Promotion", ar: "تخفيض" },
+  promo_active: { fr: "En promo", en: "On sale", ar: "تخفيض" },
+  limited_promo: { fr: "Promotion à durée limitée", en: "Limited-time promotion", ar: "عرض لفترة محدودة" },
+  enable_promo: { fr: "Activer une promotion", en: "Enable a promotion", ar: "تفعيل عرض" },
+  promo_price: { fr: "Prix promo (€/jour)", en: "Promo price (€/day)", ar: "سعر العرض" },
+  promo_until: { fr: "Promo valable jusqu'au", en: "Promo valid until", ar: "العرض صالح حتى" },
+  promo_ends: { fr: "Promo se termine le", en: "Promo ends", ar: "ينتهي العرض في" },
+  instead_of: { fr: "au lieu de", en: "instead of", ar: "بدلاً من" },
+  // Calendrier
+  availability: { fr: "Disponibilités", en: "Availability", ar: "التوفر" },
+  availability_calendar: { fr: "Calendrier de disponibilité", en: "Availability calendar", ar: "تقويم التوفر" },
+  available: { fr: "Disponible", en: "Available", ar: "متاح" },
+  unavailable: { fr: "Indisponible", en: "Unavailable", ar: "غير متاح" },
+  booked: { fr: "Réservé", en: "Booked", ar: "محجوز" },
+  // Vérification d'identité
+  identity: { fr: "Identité", en: "Identity", ar: "الهوية" },
+  verify_identity: { fr: "Vérifier mon identité", en: "Verify my identity", ar: "تأكيد هويتي" },
+  identity_verified: { fr: "Identité vérifiée", en: "Identity verified", ar: "هوية موثقة" },
+  identity_pending: { fr: "Vérification en cours", en: "Verification pending", ar: "التحقق قيد المعالجة" },
+  identity_not_verified: { fr: "Non vérifié", en: "Not verified", ar: "غير موثق" },
+  verified_owner: { fr: "Propriétaire vérifié", en: "Verified owner", ar: "مالك موثق" },
+  upload_id: { fr: "Envoyer ma pièce d'identité", en: "Upload my ID", ar: "إرسال وثيقة هويتي" },
+  identity_submitted: { fr: "Pièce envoyée ! Vérification sous 48h.", en: "ID submitted! Verification within 48h.", ar: "تم الإرسال! التحقق خلال 48 ساعة." },
 };
 
 // Helper de traduction global (utilisé par la fonction t() dans App)
@@ -2724,6 +2778,36 @@ export default function App() {
   };
 
   // 🏦 Enregistrer les infos de paiement du propriétaire (RIB ou Wafacash)
+  // ✅ Soumettre une pièce d'identité pour vérification
+  const submitIdentity = async (idImage) => {
+    if (!user || !user.fbId) { flash("Erreur compte", "#ef4444"); return; }
+    try {
+      await updateDoc(doc(db, "users", user.fbId), { identityStatus: "pending", identityImage: idImage, identitySubmittedAt: new Date().toISOString() });
+      const updatedUser = { ...user, identityStatus: "pending", identityImage: idImage };
+      setUser(updatedUser);
+      localStorage.setItem("lcy_session", JSON.stringify(updatedUser));
+      // Prévenir l'admin
+      addNotif(getAdminId(), `🆔 ${user.name} a soumis sa pièce d'identité pour vérification`, "identity");
+      sendEmail("blackberrywalid72@gmail.com", `Vérification identité — ${user.name}`, `${user.name} (${user.email}) a soumis sa pièce d'identité. Vérifiez dans l'admin.`);
+      flash("✅ Pièce envoyée ! Vérification sous 48h.");
+    } catch (e) {
+      console.log("Erreur submitIdentity:", e);
+      flash("Erreur, réessayez", "#ef4444");
+    }
+  };
+
+  // ✅ Admin : valider ou refuser une identité
+  const setIdentityStatus = async (targetUser, status) => {
+    if (!targetUser?.fbId) return;
+    try {
+      await updateDoc(doc(db, "users", targetUser.fbId), { identityStatus: status });
+      addNotif(targetUser.id, status === "verified" ? "✅ Votre identité a été vérifiée ! Vous avez maintenant le badge Vérifié." : "❌ Votre vérification d'identité a été refusée. Réessayez avec une pièce plus claire.", "identity");
+      flash(status === "verified" ? "Identité validée" : "Identité refusée");
+    } catch (e) {
+      console.log("Erreur setIdentityStatus:", e);
+    }
+  };
+
   const updatePaymentInfo = async (paymentInfo) => {
     if (!user || !user.fbId) { flash("Erreur compte", "#ef4444"); return; }
     try {
@@ -3037,7 +3121,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} t={t} lang={lang} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} t={t} lang={lang} submitIdentity={submitIdentity} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -3064,12 +3148,12 @@ export default function App() {
       </nav>
 
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={openDetail} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} t={t} shareListing={shareListing} />}
-      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} t={t} shareListing={shareListing} />}
+      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} t={t} shareListing={shareListing} users={users} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={openDetail} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} t={t} shareListing={shareListing} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} t={t} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} t={t} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} t={t} />}
-      {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
+      {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} setIdentityStatus={setIdentityStatus} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
       {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={openDetail} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} t={t} shareListing={shareListing} /> }
       {page === "terms" && <LegalPage type="terms" setPage={setPage} goBack={goBack} darkMode={darkMode} />}
@@ -3344,6 +3428,11 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
       <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setModal({ type: "contactSupport" })}>
         <span>📧 {t ? t("contact_support") : "Contact & Support"}</span>
         <span>›</span>
+      </button>
+
+      <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setModal({ type: "verifyIdentity" })}>
+        <span>✅ {t ? t("verify_identity") : "Vérifier mon identité"}</span>
+        <span style={{ fontSize: 12 }}>{user?.identityStatus === "verified" ? "✅" : user?.identityStatus === "pending" ? "⏳" : "›"}</span>
       </button>
 
       {/* 🌍 SÉLECTEUR DE LANGUE */}
@@ -3893,8 +3982,20 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
       <div style={{ padding: 22 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
           <h3 style={{ fontWeight: 700, fontSize: 16, flex: 1, marginRight: 8 }}>{l.title}</h3>
-          <div style={{ fontWeight: 800, color: "#14b8a6", whiteSpace: "nowrap" }}>{l.price}€<span style={{ fontWeight: 500, fontSize: 12, color: "#9ca3af" }}>/j</span></div>
+          {isPromoActive(l) ? (
+            <div style={{ textAlign: "end", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 12, color: "#9ca3af", textDecoration: "line-through", marginRight: 4 }}>{l.price}€</span>
+              <span style={{ fontWeight: 800, color: "#ef4444" }}>{l.promoPrice}€<span style={{ fontWeight: 500, fontSize: 12, color: "#9ca3af" }}>/j</span></span>
+            </div>
+          ) : (
+            <div style={{ fontWeight: 800, color: "#14b8a6", whiteSpace: "nowrap" }}>{l.price}€<span style={{ fontWeight: 500, fontSize: 12, color: "#9ca3af" }}>/j</span></div>
+          )}
         </div>
+        {isPromoActive(l) && (
+          <div style={{ background: "#fee2e2", color: "#991b1b", padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, marginBottom: 10, display: "inline-block" }}>
+            🔥 {tr("promo_active")} −{Math.round((1 - l.promoPrice / l.price) * 100)}% · {tr("promo_ends")} {l.promoUntil}
+          </div>
+        )}
         {rating.count > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
             <Stars value={rating.avg} size={14} />
@@ -3921,7 +4022,75 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
 }
 
 // ─── DETAIL PAGE ─────────────────────────────────────────────────────
-function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview, t, shareListing }) {
+// 📅 Calendrier de disponibilité (affiche les dates réservées/bloquées)
+function PublicAvailabilityCalendar({ listing, bookings, t }) {
+  const tr = t || ((k) => k);
+  const [monthOffset, setMonthOffset] = useState(0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const viewDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+
+  // Construire l'ensemble des dates indisponibles (réservations confirmées + dates bloquées)
+  const unavailable = new Set();
+  // Réservations de cette annonce
+  (bookings || []).filter(b => b.listingId === listing.id && b.status !== "cancelled" && b.status !== "rejected").forEach(b => {
+    let d = new Date(b.from); const end = new Date(b.to);
+    while (d <= end) { unavailable.add(d.toISOString().split("T")[0]); d.setDate(d.getDate() + 1); }
+  });
+  // Dates bloquées manuellement par le proprio
+  (listing.blockedDates || []).forEach(d => unavailable.add(d));
+
+  const monthNames = {
+    fr: ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"],
+    en: ["January","February","March","April","May","June","July","August","September","October","November","December"],
+    ar: ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"],
+  };
+  const dayNames = { fr: ["L","M","M","J","V","S","D"], en: ["M","T","W","T","F","S","S"], ar: ["إ","ث","ر","خ","ج","س","ح"] };
+  const curLang = tr("nav_home") === "Home" ? "en" : tr("nav_home") === "الرئيسية" ? "ar" : "fr";
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const startBlank = (firstDay === 0 ? 6 : firstDay - 1); // commencer lundi
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startBlank; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  return (
+    <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, marginBottom: 24 }}>
+      <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>📅 {tr("availability_calendar")}</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <button onClick={() => setMonthOffset(monthOffset - 1)} disabled={monthOffset <= 0} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, width: 32, height: 32, fontSize: 16, cursor: monthOffset <= 0 ? "not-allowed" : "pointer", opacity: monthOffset <= 0 ? 0.4 : 1 }}>‹</button>
+        <span style={{ fontWeight: 700, fontSize: 14 }}>{monthNames[curLang][month]} {year}</span>
+        <button onClick={() => setMonthOffset(monthOffset + 1)} disabled={monthOffset >= 6} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, width: 32, height: 32, fontSize: 16, cursor: monthOffset >= 6 ? "not-allowed" : "pointer", opacity: monthOffset >= 6 ? 0.4 : 1 }}>›</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+        {dayNames[curLang].map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "#9ca3af" }}>{d}</div>)}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {cells.map((d, i) => {
+          if (d === null) return <div key={i} />;
+          const dateObj = new Date(year, month, d);
+          const dateStr = dateObj.toISOString().split("T")[0];
+          const isPast = dateObj < today;
+          const isUnavailable = unavailable.has(dateStr);
+          let bg = "#f0fdf4", color = "#16a34a"; // dispo (vert clair)
+          if (isPast) { bg = "#f9fafb"; color = "#d1d5db"; }
+          else if (isUnavailable) { bg = "#fee2e2"; color = "#dc2626"; }
+          return (
+            <div key={i} style={{ textAlign: "center", padding: "8px 0", borderRadius: 8, background: bg, color: color, fontSize: 13, fontWeight: 600 }}>{d}</div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 11, justifyContent: "center", flexWrap: "wrap" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: "#f0fdf4", border: "1px solid #16a34a" }} /> {tr("available")}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: "#fee2e2", border: "1px solid #dc2626" }} /> {tr("booked")}</span>
+      </div>
+    </div>
+  );
+}
+
+function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview, t, shareListing, users }) {
   const tr = t || ((k) => k);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
@@ -4132,6 +4301,9 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
             )}
           </div>
 
+          {/* 📅 CALENDRIER DE DISPONIBILITÉ */}
+          <PublicAvailabilityCalendar listing={l} bookings={bookings} t={t} />
+
           {/* ✈️ OPTIONS DE LIVRAISON (véhicules) */}
           {isVehicle(l.type) && (l.deliveryCity || l.deliveryAirportEnabled) && (
             <div style={{ background: "#f0fdfa", border: "2px solid #99f6e4", borderRadius: 16, padding: 18, marginBottom: 24 }}>
@@ -4180,7 +4352,10 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
             <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: canChat || !user ? 18 : 0, cursor: "pointer" }} onClick={() => openOwner(l.ownerId)}>
               <div style={{ width: 70, height: 70, borderRadius: "50%", background: "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 28 }}>{l.ownerName[0]}</div>
               <div style={{ flex: 1 }}>
-                <h4 style={{ fontWeight: 700, fontSize: 17, marginBottom: 4, color: "#14b8a6" }}>👁 {l.ownerName}</h4>
+                <h4 style={{ fontWeight: 700, fontSize: 17, marginBottom: 4, color: "#14b8a6" }}>👁 {l.ownerName} {(() => {
+                  const owner = (users || []).find(u => u.id === l.ownerId);
+                  return owner?.identityStatus === "verified" ? <span title={tr("verified_owner")} style={{ fontSize: 13 }}>✅</span> : null;
+                })()}</h4>
                 <p style={{ color: "#6b7280", fontSize: 13 }}>📊 {ownerBookings} {tr("reservations_on")}</p>
                 <p style={{ color: "#14b8a6", fontSize: 11, fontWeight: 600, marginTop: 2 }}>→ {tr("view_full_profile")}</p>
                 {/* 🏆 Badges du propriétaire */}
@@ -4702,7 +4877,7 @@ function NotifPage({ notifications, goToNotif, t }) {
 }
 
 // ─── ADMIN ───────────────────────────────────────────────────────────
-function Admin({ listings, bookings, users, approveListing, rejectListing, deleteListing, deleteUser, reviews, payouts, markPayoutPaid, debtPayments, confirmDebtPayment }) {
+function Admin({ listings, bookings, users, approveListing, rejectListing, deleteListing, deleteUser, reviews, payouts, markPayoutPaid, debtPayments, confirmDebtPayment, setIdentityStatus }) {
   const [tab, setTab] = useState("dashboard");
   const pending = listings.filter(l => l.status === "pending");
   const totalRevenue = bookings.reduce((s, b) => s + b.subtotal, 0);
@@ -4900,8 +5075,17 @@ function Admin({ listings, bookings, users, approveListing, rejectListing, delet
             <div key={u.id} className="card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 16 }}>
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: u.role === "admin" ? "#0a0a0a" : "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700 }}>{u.name[0]}</div>
               <div style={{ flex: 1 }}>
-                <h4 style={{ fontWeight: 700 }}>{u.name} {u.role === "admin" && <span style={{ fontSize: 10, background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 50, fontWeight: 700 }}>ADMIN</span>}</h4>
+                <h4 style={{ fontWeight: 700 }}>{u.name} {u.role === "admin" && <span style={{ fontSize: 10, background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 50, fontWeight: 700 }}>ADMIN</span>} {u.identityStatus === "verified" && <span style={{ fontSize: 10, background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 50, fontWeight: 700 }}>✅ VÉRIFIÉ</span>} {u.identityStatus === "pending" && <span style={{ fontSize: 10, background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 50, fontWeight: 700 }}>⏳ À VÉRIFIER</span>}</h4>
                 <p style={{ color: "#6b7280", fontSize: 13 }}>{u.email} · {u.country}</p>
+                {u.identityStatus === "pending" && u.identityImage && (
+                  <div style={{ marginTop: 8 }}>
+                    <img src={u.identityImage} alt="Pièce" style={{ maxWidth: 180, borderRadius: 8, border: "1px solid #e5e7eb" }} />
+                    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                      <button className="btn" style={{ background: "#dcfce7", color: "#166534", padding: "6px 12px", fontSize: 12 }} onClick={() => setIdentityStatus(u, "verified")}>✅ Valider</button>
+                      <button className="btn" style={{ background: "#fee2e2", color: "#dc2626", padding: "6px 12px", fontSize: 12 }} onClick={() => setIdentityStatus(u, "rejected")}>❌ Refuser</button>
+                    </div>
+                  </div>
+                )}
               </div>
               {u.role !== "admin" && <button className="btn" style={{ background: "#fee2e2", color: "#dc2626", padding: "6px 14px", fontSize: 12 }} onClick={() => deleteUser(u.id)}>🗑</button>}
             </div>
@@ -4997,7 +5181,7 @@ function SearchableSelect({ options, value, onChange, placeholder = "— Choisir
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry, t, lang }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry, t, lang, submitIdentity }) {
   const [form, setForm] = useState({});
   const tr = t || ((k) => k);
   const [photos, setPhotos] = useState([]);
@@ -5016,7 +5200,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
     // ✏️ Pré-remplir le formulaire avec l'annonce à modifier
     if (modal?.type === "edit" && modal.data) {
       const l = modal.data;
-      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "", vehicleType: l.vehicleType || "", deliveryCity: l.deliveryCity || false, deliveryAirportEnabled: l.deliveryAirportEnabled || false, airportDeliveries: l.airportDeliveries || {} });
+      setForm({ type: l.type, title: l.title, country: l.country, city: l.city, price: l.price, desc: l.desc, mapLink: l.mapLink || "", offerMinDays: l.offerMinDays || "", offerPrice: l.offerPrice || "", rooms: l.rooms || "", guests: l.guests || "", wifi: l.wifi, seats: l.seats || "", fuel: l.fuel || "", transmission: l.transmission || "", cc: l.cc || "", vehicleType: l.vehicleType || "", deliveryCity: l.deliveryCity || false, deliveryAirportEnabled: l.deliveryAirportEnabled || false, airportDeliveries: l.airportDeliveries || {}, promoPrice: l.promoPrice || "", promoUntil: l.promoUntil || "" });
       // Pré-charger les photos existantes (sauf si c'est juste un emoji par défaut)
       setPhotos(Array.isArray(l.photos) && l.photos.length > 0 && l.photos[0].startsWith("data:") ? l.photos : []);
     }
@@ -5041,6 +5225,37 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
     <div className="overlay" onClick={e => e.target === e.currentTarget && close()}>
       <div className="modal">
         <button onClick={close} style={{ position: "absolute", top: 18, right: 18, background: "#f3f4f6", borderRadius: "50%", width: 34, height: 34, fontSize: 18, fontWeight: 600, zIndex: 5 }}>×</button>
+
+        {modal.type === "verifyIdentity" && (
+          <div>
+            <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 6 }}>✅ {tr("verify_identity")}</h2>
+            <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 18 }}>Envoyez une photo de votre pièce d'identité (carte, passeport ou permis). Elle sera vérifiée sous 48h et restera confidentielle.</p>
+            {user?.identityStatus === "verified" ? (
+              <div style={{ background: "#dcfce7", color: "#166534", padding: 16, borderRadius: 12, textAlign: "center", fontWeight: 700 }}>✅ {tr("identity_verified")}</div>
+            ) : user?.identityStatus === "pending" ? (
+              <div style={{ background: "#fef3c7", color: "#92400e", padding: 16, borderRadius: 12, textAlign: "center", fontWeight: 700 }}>⏳ {tr("identity_pending")}</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <label style={{ border: "2px dashed #14b8a6", borderRadius: 12, padding: 24, textAlign: "center", cursor: "pointer", background: "#f0fdfa" }}>
+                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => set("idImage", ev.target.result);
+                    reader.readAsDataURL(file);
+                  }} />
+                  {form.idImage ? <img src={form.idImage} alt="ID" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8 }} /> : <span style={{ color: "#0d9488", fontWeight: 600 }}>📎 {tr("upload_id")}</span>}
+                </label>
+                {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
+                <button className="btn btn-primary" style={{ width: "100%", padding: 14 }} onClick={() => {
+                  if (!form.idImage) { setFormError("Veuillez choisir une photo de votre pièce"); return; }
+                  submitIdentity(form.idImage);
+                  setModal(null);
+                }}>✅ {tr("upload_id")}</button>
+              </div>
+            )}
+          </div>
+        )}
 
         {modal.type === "contactSupport" && (
           <div>
@@ -5396,6 +5611,30 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   <p style={{ fontSize: 11, color: "#166534", background: "#dcfce7", padding: 8, borderRadius: 8, marginTop: 6 }}>
                     💡 Si un client réserve <strong>{form.offerMinDays}+ jours</strong>, le prix sera de <strong>{form.offerPrice}€/jour</strong> au lieu de {form.price}€/jour (économie de <strong>{Math.round((1 - form.offerPrice / form.price) * 100)}%</strong>)
                   </p>
+                )}
+              </div>
+
+              {/* 🎁 PROMOTION À DURÉE LIMITÉE */}
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 14 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, display: "block", marginBottom: 8, color: "#991b1b" }}>🎁 {tr("limited_promo")} (optionnel)</label>
+                <p style={{ fontSize: 11, color: "#7f1d1d", marginBottom: 10 }}>Baissez le prix pendant une période précise. La promo s'arrête automatiquement à la date choisie.</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d" }}>{tr("promo_price")}</label>
+                    <input className="input" type="number" placeholder="20" value={form.promoPrice || ""} onChange={e => set("promoPrice", parseFloat(e.target.value) || 0)} style={{ background: "white", marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d" }}>{tr("promo_until")}</label>
+                    <input className="input" type="date" min={new Date().toISOString().split("T")[0]} value={form.promoUntil || ""} onChange={e => set("promoUntil", e.target.value)} style={{ background: "white", marginTop: 4 }} />
+                  </div>
+                </div>
+                {form.promoPrice > 0 && form.promoUntil && form.price > 0 && form.promoPrice < form.price && (
+                  <p style={{ fontSize: 11, color: "#991b1b", background: "#fee2e2", padding: 8, borderRadius: 8, marginTop: 8 }}>
+                    🔥 Promo : <strong>{form.promoPrice}€/jour</strong> au lieu de {form.price}€ (−<strong>{Math.round((1 - form.promoPrice / form.price) * 100)}%</strong>) jusqu'au {form.promoUntil}
+                  </p>
+                )}
+                {form.promoPrice > 0 && form.price > 0 && form.promoPrice >= form.price && (
+                  <p style={{ fontSize: 11, color: "#991b1b", marginTop: 8 }}>⚠️ Le prix promo doit être inférieur au prix normal ({form.price}€)</p>
                 )}
               </div>
               {isLodging(form.type) && (
