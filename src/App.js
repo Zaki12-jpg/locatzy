@@ -1487,6 +1487,47 @@ const TRANSLATIONS = {
   // Notifications page
   notifications: { fr: "Notifications", en: "Notifications", ar: "الإشعارات" },
   no_notifications: { fr: "Aucune notification", en: "No notifications", ar: "لا توجد إشعارات" },
+  // Messages
+  messages_title: { fr: "Messages", en: "Messages", ar: "الرسائل" },
+  no_messages: { fr: "Aucun message", en: "No messages", ar: "لا توجد رسائل" },
+  type_message: { fr: "Écrivez un message...", en: "Type a message...", ar: "اكتب رسالة..." },
+  send: { fr: "Envoyer", en: "Send", ar: "إرسال" },
+  // Détail annonce
+  description: { fr: "Description", en: "Description", ar: "الوصف" },
+  reviews: { fr: "Avis", en: "Reviews", ar: "التقييمات" },
+  no_reviews: { fr: "Aucun avis pour le moment", en: "No reviews yet", ar: "لا توجد تقييمات بعد" },
+  contact_owner: { fr: "Contacter le propriétaire", en: "Contact owner", ar: "تواصل مع المالك" },
+  per_day: { fr: "/ jour", en: "/ day", ar: "/ يوم" },
+  features: { fr: "Caractéristiques", en: "Features", ar: "المميزات" },
+  location: { fr: "Emplacement", en: "Location", ar: "الموقع" },
+  // Formulaire annonce
+  add_listing: { fr: "Nouvelle annonce", en: "New listing", ar: "إعلان جديد" },
+  edit_listing: { fr: "Modifier l'annonce", en: "Edit listing", ar: "تعديل الإعلان" },
+  listing_type: { fr: "Type d'annonce", en: "Listing type", ar: "نوع الإعلان" },
+  title: { fr: "Titre", en: "Title", ar: "العنوان" },
+  country: { fr: "Pays", en: "Country", ar: "الدولة" },
+  city: { fr: "Ville", en: "City", ar: "المدينة" },
+  price: { fr: "Prix", en: "Price", ar: "السعر" },
+  photos: { fr: "Photos", en: "Photos", ar: "الصور" },
+  choose: { fr: "Choisir", en: "Choose", ar: "اختر" },
+  submit: { fr: "Soumettre", en: "Submit", ar: "إرسال" },
+  rooms: { fr: "Chambres", en: "Rooms", ar: "الغرف" },
+  guests: { fr: "Voyageurs", en: "Guests", ar: "الضيوف" },
+  seats: { fr: "Places", en: "Seats", ar: "المقاعد" },
+  fuel: { fr: "Carburant", en: "Fuel", ar: "الوقود" },
+  transmission: { fr: "Transmission", en: "Transmission", ar: "ناقل الحركة" },
+  // Admin
+  admin_overview: { fr: "Vue d'ensemble", en: "Overview", ar: "نظرة عامة" },
+  admin_moderate: { fr: "À modérer", en: "To moderate", ar: "للمراجعة" },
+  admin_bookings: { fr: "Réservations", en: "Bookings", ar: "الحجوزات" },
+  admin_payouts: { fr: "Versements", en: "Payouts", ar: "المدفوعات" },
+  admin_users: { fr: "Utilisateurs", en: "Users", ar: "المستخدمون" },
+  approve: { fr: "Approuver", en: "Approve", ar: "موافقة" },
+  reject: { fr: "Rejeter", en: "Reject", ar: "رفض" },
+  // Statuts
+  status_pending: { fr: "En attente", en: "Pending", ar: "قيد الانتظار" },
+  status_approved: { fr: "Approuvée", en: "Approved", ar: "تمت الموافقة" },
+  status_confirmed: { fr: "Confirmée", en: "Confirmed", ar: "مؤكد" },
 };
 
 // Helper de traduction global (utilisé par la fonction t() dans App)
@@ -2742,11 +2783,11 @@ export default function App() {
       </nav>
 
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} t={t} />}
-      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
+      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} t={t} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} t={t} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} t={t} />}
-      {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
+      {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} t={t} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
       {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} /> }
@@ -3411,7 +3452,8 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
 }
 
 // ─── DETAIL PAGE ─────────────────────────────────────────────────────
-function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview }) {
+function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview, t }) {
+  const tr = t || ((k) => k);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
@@ -3556,7 +3598,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
         <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 20, padding: 20, boxShadow: "0 8px 28px rgba(0,0,0,0.08)", marginBottom: 28 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
             <span className="display" style={{ fontSize: 26, fontWeight: 800 }}>{l.price}€</span>
-            <span style={{ color: "#6b7280", fontSize: 14 }}>/ jour</span>
+            <span style={{ color: "#6b7280", fontSize: 14 }}>{tr("per_day")}</span>
           </div>
           {rating.count > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16, fontSize: 13 }}>
@@ -3565,8 +3607,8 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
               <span style={{ color: "#6b7280" }}>· {rating.count} avis</span>
             </div>
           )}
-          <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 Réserver maintenant</button>
-          <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={() => user ? setModal({ type: "contactOwner", data: l }) : setModal({ type: "login" })}>💬 Contacter le propriétaire</button>
+          <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 {tr("btn_book")}</button>
+          <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={() => user ? setModal({ type: "contactOwner", data: l }) : setModal({ type: "login" })}>💬 {tr("contact_owner")}</button>
           <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10 }}>🛡 Vous ne paierez rien maintenant · Sécurisé par Locatzy</p>
         </div>
       </div>
@@ -3807,7 +3849,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
             {listingReviews.length === 0 ? (
               <div style={{ background: "#f9fafb", borderRadius: 16, padding: 30, textAlign: "center", color: "#9ca3af" }}>
                 <div style={{ fontSize: 36, marginBottom: 8 }}>⭐</div>
-                <p style={{ fontSize: 14 }}>Aucun avis pour le moment.</p>
+                <p style={{ fontSize: 14 }}>{tr("no_reviews")}</p>
                 <p style={{ fontSize: 12, marginTop: 4 }}>Soyez le premier à laisser un avis après votre séjour !</p>
               </div>
             ) : (
@@ -4118,7 +4160,7 @@ function MyPage({ myListings, myBookingsAsRenter, bookingsOnMyListings, bookings
 }
 
 // ─── MESSAGES PAGE ───────────────────────────────────────────────────
-function MessagesPage({ user, messages, listings, users, setModal, markMessagesRead }) {
+function MessagesPage({ user, messages, listings, users, setModal, markMessagesRead, t }) {
   // Grouper par conversationId
   const conversations = {};
   messages.forEach(m => {
@@ -4138,8 +4180,8 @@ function MessagesPage({ user, messages, listings, users, setModal, markMessagesR
 
   return (
     <div style={{ padding: "16px" }}>
-      <h2 className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>💬 Messages</h2>
-      {sortedConvs.length === 0 ? <Empty icon="💬" msg="Aucun message pour le moment" /> :
+      <h2 className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>💬 {t ? t("messages_title") : "Messages"}</h2>
+      {sortedConvs.length === 0 ? <Empty icon="💬" msg={t ? t("no_messages") : "Aucun message pour le moment"} /> :
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sortedConvs.map(c => (
             <div key={c.id} onClick={() => { markMessagesRead(c.id); setModal({ type: "chat", data: { conversationId: c.id, otherId: c.otherId, otherName: c.otherName, listing: c.listing } }); }} className="card" style={{ padding: 16, cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}>
@@ -4728,14 +4770,14 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   </div>
                 </div>
               )}
-              <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Titre *</label>
-                <input className="input" placeholder="Ex : Audi A3, Loft moderne…" value={form.title || ""} onChange={e => set("title", e.target.value)} />
+              <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{tr("title")} *</label>
+                <input className="input" placeholder="Ex : Audi A3, Loft…" value={form.title || ""} onChange={e => set("title", e.target.value)} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Pays *</label>
-                  <SearchableSelect options={Object.keys(COUNTRIES).sort()} value={form.country || ""} onChange={v => { set("country", v); set("city", ""); set("customCity", ""); }} placeholder="— Choisir —" />
+                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{tr("country")} *</label>
+                  <SearchableSelect options={Object.keys(COUNTRIES).sort()} value={form.country || ""} onChange={v => { set("country", v); set("city", ""); set("customCity", ""); }} placeholder="—" />
                 </div>
-                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Ville *</label>
+                <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{tr("city")} *</label>
                   <SearchableSelect
                     options={form.country ? getCitiesForCountry(form.country) : []}
                     value={form.city === "__other__" ? "✏️ Ma ville n'est pas listée" : (form.city || "")}
@@ -5052,7 +5094,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 </>
               )}
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📸 Photos (jusqu'à 5)</label>
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📸 {tr("photos")} (max 5)</label>
                 <label className="btn btn-ghost" style={{ display: "inline-block", textAlign: "center", width: "100%" }}>📎 Choisir<input type="file" multiple accept="image/*" onChange={handlePhotos} style={{ display: "none" }} /></label>
                 {photos.length > 0 && (
                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -5096,7 +5138,7 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                 const { showAddType, newTypeLabel, ...cleanForm } = form;
                 const finalData = { ...cleanForm, city: finalCity, photos: photos.length > 0 ? photos : [getTypeInfo(form.type)?.icon || "🏠"] };
                 addListing(finalData);
-              }}>{modal.type === "edit" ? "✓ Enregistrer les modifications" : "✓ Soumettre"}</button>
+              }}>{modal.type === "edit" ? `✓ ${tr("btn_save")}` : `✓ ${tr("submit")}`}</button>
             </div>
           </>
         )}
