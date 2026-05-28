@@ -1555,6 +1555,21 @@ const TRANSLATIONS = {
   wifi_included: { fr: "WiFi inclus", en: "WiFi included", ar: "واي فاي مشمول" },
   per_night: { fr: "/ nuit", en: "/ night", ar: "/ ليلة" },
   seats_label: { fr: "places", en: "seats", ar: "مقاعد" },
+  // Contact propriétaire + avis
+  leave_review: { fr: "Laisser un avis", en: "Leave a review", ar: "اترك تقييمًا" },
+  your_own_listing: { fr: "C'est votre annonce. Consultez vos messages reçus dans", en: "This is your listing. Check your messages in", ar: "هذا إعلانك. تحقق من رسائلك في" },
+  how_was_stay: { fr: "Comment s'est passé votre séjour ?", en: "How was your stay?", ar: "كيف كانت إقامتك؟" },
+  you_stayed_from: { fr: "Vous avez séjourné du", en: "You stayed from", ar: "أقمت من" },
+  share_experience: { fr: "Partagez votre expérience pour aider les futurs locataires.", en: "Share your experience to help future renters.", ar: "شارك تجربتك لمساعدة المستأجرين المستقبليين." },
+  booking_ongoing: { fr: "Réservation en cours", en: "Ongoing booking", ar: "حجز جاري" },
+  can_review_after: { fr: "Vous pourrez laisser un avis après le", en: "You can leave a review after", ar: "يمكنك ترك تقييم بعد" },
+  be_first_review: { fr: "Soyez le premier à laisser un avis après votre séjour !", en: "Be the first to leave a review after your stay!", ar: "كن أول من يترك تقييمًا بعد إقامتك!" },
+  reservations_on: { fr: "réservations sur Locatzy", en: "bookings on Locatzy", ar: "حجوزات على Locatzy" },
+  view_full_profile: { fr: "Voir son profil complet", en: "View full profile", ar: "عرض الملف الكامل" },
+  badge_new_member: { fr: "Nouveau membre", en: "New member", ar: "عضو جديد" },
+  badge_first_trip: { fr: "Premier voyage", en: "First trip", ar: "أول رحلة" },
+  badge_traveler: { fr: "Voyageur", en: "Traveler", ar: "مسافر" },
+  badge_globetrotter: { fr: "Globetrotteur", en: "Globetrotter", ar: "جوّاب آفاق" },
 };
 
 // Helper de traduction global (utilisé par la fonction t() dans App)
@@ -3733,13 +3748,13 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
 
           {/* Propriétaire + Messagerie intégrée */}
           <div style={{ background: "#f9fafb", borderRadius: 18, padding: 24, marginBottom: 32 }}>
-            <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>💬 Contacter le propriétaire</h3>
+            <h3 style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>💬 {tr("contact_owner")}</h3>
             <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: canChat || !user ? 18 : 0, cursor: "pointer" }} onClick={() => openOwner(l.ownerId)}>
               <div style={{ width: 70, height: 70, borderRadius: "50%", background: "linear-gradient(135deg,#14b8a6,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 28 }}>{l.ownerName[0]}</div>
               <div style={{ flex: 1 }}>
                 <h4 style={{ fontWeight: 700, fontSize: 17, marginBottom: 4, color: "#14b8a6" }}>👁 {l.ownerName}</h4>
-                <p style={{ color: "#6b7280", fontSize: 13 }}>📊 {ownerBookings} réservation{ownerBookings > 1 ? "s" : ""} sur Locatzy</p>
-                <p style={{ color: "#14b8a6", fontSize: 11, fontWeight: 600, marginTop: 2 }}>→ Voir son profil complet</p>
+                <p style={{ color: "#6b7280", fontSize: 13 }}>📊 {ownerBookings} {tr("reservations_on")}</p>
+                <p style={{ color: "#14b8a6", fontSize: 11, fontWeight: 600, marginTop: 2 }}>→ {tr("view_full_profile")}</p>
                 {/* 🏆 Badges du propriétaire */}
                 {(() => {
                   const ownerBadges = getUserBadges(l.ownerId);
@@ -3748,7 +3763,9 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
                     <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
                       {ownerBadges.slice(0, 4).map(key => {
                         const b = ALL_BADGES[key];
-                        return <span key={key} title={b.label} style={{ background: "white", border: `1.5px solid ${b.color}`, color: b.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 50, display: "inline-flex", alignItems: "center", gap: 3 }}>{b.icon} {b.label}</span>;
+                        const badgeKeyMap = { newbie: "badge_new_member", firstTrip: "badge_first_trip", traveler: "badge_traveler", globetrotter: "badge_globetrotter" };
+                        const badgeLabel = badgeKeyMap[key] ? tr(badgeKeyMap[key]) : b.label;
+                        return <span key={key} title={badgeLabel} style={{ background: "white", border: `1.5px solid ${b.color}`, color: b.color, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 50, display: "inline-flex", alignItems: "center", gap: 3 }}>{b.icon} {badgeLabel}</span>;
                       })}
                     </div>
                   );
@@ -3767,7 +3784,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
             {/* Cas 2 : c'est ma propre annonce */}
             {isOwnListing && (
               <div style={{ background: "white", borderRadius: 12, padding: 16, textAlign: "center", fontSize: 14, color: "#6b7280" }}>
-                😊 C'est votre annonce. Consultez vos messages reçus dans <button onClick={() => setPage("messages")} style={{ background: "none", color: "#14b8a6", fontWeight: 700 }}>💬 Messages</button>
+                😊 {tr("your_own_listing")} <button onClick={() => setPage("messages")} style={{ background: "none", color: "#14b8a6", fontWeight: 700 }}>💬 {tr("messages_title")}</button>
               </div>
             )}
 
@@ -3805,7 +3822,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
           <div style={{ marginBottom: 32 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ fontWeight: 700, fontSize: 18 }}>
-                {rating.count > 0 ? <>⭐ {rating.avg} · {rating.count} avis</> : "⭐ Avis"}
+                {rating.count > 0 ? <>⭐ {rating.avg} · {rating.count} {tr("reviews")}</> : `⭐ ${tr("reviews")}`}
               </h3>
             </div>
 
@@ -3825,10 +3842,10 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
                 <div style={{ background: "linear-gradient(135deg,#fef3c7,#fde68a)", border: "1px solid #fcd34d", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
                   <div style={{ fontSize: 38 }}>⭐</div>
                   <div style={{ flex: 1 }}>
-                    <h4 style={{ fontWeight: 800, color: "#78350f", fontSize: 16, marginBottom: 4 }}>Comment s'est passé votre séjour ?</h4>
-                    <p style={{ color: "#92400e", fontSize: 13 }}>Vous avez séjourné du {lastStay.from} au {lastStay.to}. Partagez votre expérience pour aider les futurs locataires.</p>
+                    <h4 style={{ fontWeight: 800, color: "#78350f", fontSize: 16, marginBottom: 4 }}>{tr("how_was_stay")}</h4>
+                    <p style={{ color: "#92400e", fontSize: 13 }}>{tr("you_stayed_from")} {lastStay.from} → {lastStay.to}. {tr("share_experience")}</p>
                   </div>
-                  <button className="btn btn-primary" onClick={() => setModal({ type: "review", data: { listingId: l.id, listingTitle: l.title } })}>✍️ Laisser un avis</button>
+                  <button className="btn btn-primary" onClick={() => setModal({ type: "review", data: { listingId: l.id, listingTitle: l.title } })}>✍️ {tr("leave_review")}</button>
                 </div>
               );
             })()}
@@ -3849,8 +3866,8 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
                 <div style={{ background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 16, padding: 16, marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ fontSize: 28 }}>📅</div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: 700, color: "#0f766e", fontSize: 14 }}>Réservation en cours</p>
-                    <p style={{ color: "#0d9488", fontSize: 12 }}>Du {upcoming.from} au {upcoming.to} · Vous pourrez laisser un avis après le {upcoming.to}</p>
+                    <p style={{ fontWeight: 700, color: "#0f766e", fontSize: 14 }}>{tr("booking_ongoing")}</p>
+                    <p style={{ color: "#0d9488", fontSize: 12 }}>{upcoming.from} → {upcoming.to} · {tr("can_review_after")} {upcoming.to}</p>
                   </div>
                 </div>
               );
@@ -3878,7 +3895,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
               <div style={{ background: "#f9fafb", borderRadius: 16, padding: 30, textAlign: "center", color: "#9ca3af" }}>
                 <div style={{ fontSize: 36, marginBottom: 8 }}>⭐</div>
                 <p style={{ fontSize: 14 }}>{tr("no_reviews")}</p>
-                <p style={{ fontSize: 12, marginTop: 4 }}>Soyez le premier à laisser un avis après votre séjour !</p>
+                <p style={{ fontSize: 12, marginTop: 4 }}>{tr("be_first_review")}</p>
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
