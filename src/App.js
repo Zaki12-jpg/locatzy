@@ -1594,6 +1594,28 @@ const TRANSLATIONS = {
   // FAQ / Comment ça marche
   how_it_works: { fr: "Comment ça marche ?", en: "How it works", ar: "كيف يعمل؟" },
   faq: { fr: "Aide & FAQ", en: "Help & FAQ", ar: "المساعدة والأسئلة" },
+  // Tri
+  sort_by: { fr: "Trier", en: "Sort", ar: "ترتيب" },
+  sort_recent: { fr: "Plus récents", en: "Most recent", ar: "الأحدث" },
+  sort_price_asc: { fr: "Prix croissant", en: "Price: low to high", ar: "السعر: من الأقل" },
+  sort_price_desc: { fr: "Prix décroissant", en: "Price: high to low", ar: "السعر: من الأعلى" },
+  sort_rating: { fr: "Mieux notés", en: "Top rated", ar: "الأعلى تقييمًا" },
+  // Contact / Support
+  contact_support: { fr: "Contact & Support", en: "Contact & Support", ar: "الاتصال والدعم" },
+  contact_us: { fr: "Nous contacter", en: "Contact us", ar: "اتصل بنا" },
+  your_message: { fr: "Votre message", en: "Your message", ar: "رسالتك" },
+  subject: { fr: "Sujet", en: "Subject", ar: "الموضوع" },
+  send_message: { fr: "Envoyer le message", en: "Send message", ar: "إرسال الرسالة" },
+  message_sent: { fr: "Message envoyé ! Nous vous répondrons vite.", en: "Message sent! We'll reply soon.", ar: "تم إرسال الرسالة! سنرد قريبًا." },
+  // Signaler
+  report: { fr: "Signaler", en: "Report", ar: "إبلاغ" },
+  report_listing: { fr: "Signaler cette annonce", en: "Report this listing", ar: "الإبلاغ عن هذا الإعلان" },
+  report_reason: { fr: "Pourquoi signalez-vous cette annonce ?", en: "Why are you reporting this listing?", ar: "لماذا تبلغ عن هذا الإعلان؟" },
+  report_fraud: { fr: "Annonce frauduleuse / arnaque", en: "Fraudulent listing / scam", ar: "إعلان احتيالي" },
+  report_fake: { fr: "Fausses informations / photos", en: "Fake info / photos", ar: "معلومات / صور مزيفة" },
+  report_inappropriate: { fr: "Contenu inapproprié", en: "Inappropriate content", ar: "محتوى غير لائق" },
+  report_other: { fr: "Autre raison", en: "Other reason", ar: "سبب آخر" },
+  report_sent: { fr: "Merci ! Votre signalement a été envoyé à notre équipe.", en: "Thank you! Your report was sent to our team.", ar: "شكرًا! تم إرسال بلاغك إلى فريقنا." },
 };
 
 // Helper de traduction global (utilisé par la fonction t() dans App)
@@ -3319,6 +3341,11 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
         <span>›</span>
       </button>
 
+      <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setModal({ type: "contactSupport" })}>
+        <span>📧 {t ? t("contact_support") : "Contact & Support"}</span>
+        <span>›</span>
+      </button>
+
       {/* 🌍 SÉLECTEUR DE LANGUE */}
       <div style={{ marginBottom: 10, padding: 14, border: "1px solid #e5e7eb", borderRadius: 12, background: darkMode ? "#1a1a1a" : "white" }}>
         <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>🌍 {t ? t("language") : "Langue"}</p>
@@ -3368,6 +3395,19 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
   const [lodgingDropdownOpen, setLodgingDropdownOpen] = useState(false);
   const [vehicleDropdownOpen, setVehicleDropdownOpen] = useState(false);
   const [advancedDropdownOpen, setAdvancedDropdownOpen] = useState(false);
+  const [sortBy, setSortBy] = useState("recent"); // recent | price_asc | price_desc | rating
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+
+  // Trier les annonces selon le choix
+  const sortedListings = [...listings].sort((a, b) => {
+    if (sortBy === "price_asc") return (a.price || 0) - (b.price || 0);
+    if (sortBy === "price_desc") return (b.price || 0) - (a.price || 0);
+    if (sortBy === "rating") return (b.avgRating || 0) - (a.avgRating || 0);
+    // recent : par id décroissant (les plus récents d'abord)
+    return (b.createdAt || b.id || 0) > (a.createdAt || a.id || 0) ? 1 : -1;
+  });
+
+  const SORT_LABELS = { recent: tr("sort_recent"), price_asc: tr("sort_price_asc"), price_desc: tr("sort_price_desc"), rating: tr("sort_rating") };
   return (
     <div>
       <div className="hero-section" style={{ background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)", padding: "32px 20px 50px", position: "relative", overflow: "hidden" }}>
@@ -3421,11 +3461,33 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
                 return count > 0 ? `(${count})` : "";
               })()} ▾
             </button>
+            <button className={`pill ${sortBy !== "recent" ? "active" : ""}`} onClick={() => setSortDropdownOpen(!sortDropdownOpen)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              ↕️ {SORT_LABELS[sortBy]} ▾
+            </button>
           </>;
         })()}
       </div>
 
-      {/* MENU FILTRES AVANCÉS */}
+      {/* MENU DE TRI */}
+      {sortDropdownOpen && (
+        <>
+          <div onClick={() => setSortDropdownOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 80 }} />
+          <div style={{ position: "fixed", bottom: 70, left: "50%", transform: "translateX(-50%)", width: "calc(100% - 32px)", maxWidth: 400, background: "white", borderRadius: 20, boxShadow: "0 -10px 40px rgba(0,0,0,0.2)", zIndex: 85, overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontWeight: 800, fontSize: 16 }}>↕️ {tr("sort_by")}</h3>
+              <button onClick={() => setSortDropdownOpen(false)} style={{ background: "#f3f4f6", borderRadius: "50%", width: 30, height: 30, fontSize: 16 }}>×</button>
+            </div>
+            <div style={{ padding: 10 }}>
+              {[["recent", "🕒"], ["price_asc", "⬆️"], ["price_desc", "⬇️"], ["rating", "⭐"]].map(([key, icon]) => (
+                <button key={key} onClick={() => { setSortBy(key); setSortDropdownOpen(false); }} style={{ width: "100%", textAlign: "start", padding: 14, background: sortBy === key ? "#f0fdfa" : "white", border: sortBy === key ? "2px solid #14b8a6" : "2px solid transparent", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 18 }}>{icon}</span> {SORT_LABELS[key]}
+                  {sortBy === key && <span style={{ marginLeft: "auto", color: "#14b8a6" }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
       {advancedDropdownOpen && (
         <>
           <div onClick={() => setAdvancedDropdownOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 80 }} />
@@ -3678,7 +3740,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
         )}
         <div className="listings-grid" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {listings.length === 0 ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 60, color: "#9ca3af" }}><div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div><p>{dateFrom && dateTo ? "Aucune annonce disponible à ces dates" : "Aucune annonce trouvée"}</p>{dateFrom && dateTo && <p style={{ fontSize: 12, marginTop: 8 }}>Essayez d'autres dates</p>}</div>
-          : listings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={tr} shareListing={shareListing} />)}
+          : sortedListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={tr} shareListing={shareListing} />)}
         </div>
       </div>
     </div>
@@ -4017,6 +4079,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
           <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 {tr("book_now")}</button>
           <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={() => user ? setModal({ type: "contactOwner", data: l }) : setModal({ type: "login" })}>💬 {tr("contact_owner")}</button>
           {isNativeApp() && <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14, marginTop: 8, border: "1.5px solid #14b8a6", color: "#0d9488" }} onClick={() => shareListing && shareListing(l)}>🔗 {tr("share")}</button>}
+          {user && user.id !== l.ownerId && <button className="btn btn-ghost" style={{ width: "100%", padding: 10, fontSize: 12, marginTop: 8, color: "#9ca3af" }} onClick={() => setModal({ type: "reportListing", data: l })}>🚩 {tr("report")}</button>}
           <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10 }}>🛡 {tr("pay_nothing_now")} · {tr("secured_by")}</p>
         </div>
       </div>
@@ -4978,6 +5041,59 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
     <div className="overlay" onClick={e => e.target === e.currentTarget && close()}>
       <div className="modal">
         <button onClick={close} style={{ position: "absolute", top: 18, right: 18, background: "#f3f4f6", borderRadius: "50%", width: 34, height: 34, fontSize: 18, fontWeight: 600, zIndex: 5 }}>×</button>
+
+        {modal.type === "contactSupport" && (
+          <div>
+            <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 6 }}>📧 {tr("contact_us")}</h2>
+            <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 18 }}>Locatzy Support · blackberrywalid72@gmail.com</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{tr("subject")} *</label>
+                <input className="input" placeholder={tr("subject")} value={form.supportSubject || ""} onChange={e => set("supportSubject", e.target.value)} /></div>
+              <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>📧 {tr("email")} *</label>
+                <input className="input" type="email" placeholder="votre@email.com" value={form.supportEmail || (user?.email || "")} onChange={e => set("supportEmail", e.target.value)} /></div>
+              <div><label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>💬 {tr("your_message")} *</label>
+                <textarea className="input" rows={5} placeholder={tr("your_message")} value={form.supportMsg || ""} onChange={e => set("supportMsg", e.target.value)} style={{ resize: "vertical" }} /></div>
+              {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
+              <button className="btn btn-primary" style={{ width: "100%", padding: 14 }} onClick={() => {
+                const subj = (form.supportSubject || "").trim();
+                const mail = (form.supportEmail || user?.email || "").trim();
+                const msg = (form.supportMsg || "").trim();
+                if (!subj || !mail || !msg) { setFormError("Tous les champs sont obligatoires"); return; }
+                sendEmail("blackberrywalid72@gmail.com", `[Support] ${subj}`, `De : ${mail}\n\n${msg}`);
+                flash(tr("message_sent"));
+                setModal(null);
+              }}>{tr("send_message")}</button>
+            </div>
+          </div>
+        )}
+
+        {modal.type === "reportListing" && (
+          <div>
+            <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 6 }}>🚩 {tr("report_listing")}</h2>
+            <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 18 }}>{modal.data?.title}</p>
+            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{tr("report_reason")}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {[["fraud", tr("report_fraud")], ["fake", tr("report_fake")], ["inappropriate", tr("report_inappropriate")], ["other", tr("report_other")]].map(([key, label]) => (
+                <button key={key} onClick={() => set("reportReason", key)} style={{ textAlign: "start", padding: 14, background: form.reportReason === key ? "#fef2f2" : "white", border: form.reportReason === key ? "2px solid #ef4444" : "2px solid #e5e7eb", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                  {form.reportReason === key ? "🔴" : "⚪"} {label}
+                </button>
+              ))}
+              <textarea className="input" rows={3} placeholder={tr("your_message")} value={form.reportDetail || ""} onChange={e => set("reportDetail", e.target.value)} style={{ resize: "vertical", marginTop: 6 }} />
+              {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600 }}>⚠️ {formError}</div>}
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModal(null)}>{tr("btn_cancel")}</button>
+                <button className="btn btn-primary" style={{ flex: 2, background: "#ef4444" }} onClick={() => {
+                  if (!form.reportReason) { setFormError("Choisissez une raison"); return; }
+                  const reasonLabels = { fraud: tr("report_fraud"), fake: tr("report_fake"), inappropriate: tr("report_inappropriate"), other: tr("report_other") };
+                  const l = modal.data;
+                  sendEmail("blackberrywalid72@gmail.com", `[Signalement] ${l?.title}`, `Annonce signalée : ${l?.title} (ID ${l?.id})\nProprio : ${l?.ownerName} (${l?.ownerEmail})\nRaison : ${reasonLabels[form.reportReason]}\nDétail : ${form.reportDetail || "—"}\nSignalé par : ${user?.name || "Anonyme"} (${user?.email || "—"})`);
+                  flash(tr("report_sent"));
+                  setModal(null);
+                }}>🚩 {tr("report")}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {modal.type === "faq" && (() => {
           const content = FAQ_CONTENT[lang] || FAQ_CONTENT.fr;
