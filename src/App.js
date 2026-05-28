@@ -1955,8 +1955,17 @@ export default function App() {
       setSelectedListing(listing);
       setPage("detail");
     }
-    // Nettoyer l'URL pour revenir à la racine (évite de recharger en boucle)
-    window.history.replaceState({}, "", window.location.origin + "/");
+    // Si c'était un ancien format (?annonce / ?a), on remplace par la belle URL
+    if (!pathMatch) {
+      if (listing) {
+        const cat = isVehicle(listing.type) ? "vehicule" : "logement";
+        const slug = makeSlug(listing.title) || "annonce";
+        window.history.replaceState({}, "", `${window.location.origin}/${cat}/${slug}/${listing.id}`);
+      } else {
+        window.history.replaceState({}, "", window.location.origin + "/");
+      }
+    }
+    // Si c'était déjà une belle URL (pathMatch), on la garde telle quelle ✨
   }, [listings]);
 
 
@@ -2758,7 +2767,38 @@ export default function App() {
       if (previous === "notif") markAllRead();
       return h.slice(0, -1);
     });
+    // Remettre l'URL à la racine quand on quitte le détail
+    if (window.location.pathname !== "/") {
+      window.history.replaceState({}, "", window.location.origin + "/");
+    }
   };
+
+  // 🔗 Ouvrir le détail d'une annonce ET changer l'URL en belle URL (/logement/villa/142)
+  const openDetail = (listing) => {
+    if (!listing) return;
+    setSelectedListing(listing);
+    setPage("detail");
+    // Mettre à jour l'adresse du navigateur (sans recharger la page)
+    try {
+      const cat = isVehicle(listing.type) ? "vehicule" : "logement";
+      const slug = makeSlug(listing.title) || "annonce";
+      const niceUrl = `${window.location.origin}/${cat}/${slug}/${listing.id}`;
+      window.history.pushState({}, "", niceUrl);
+    } catch (e) { /* ignore si erreur URL */ }
+  };
+
+  // 🔙 Gérer le bouton "Retour" du navigateur quand l'URL a changé (belle URL)
+  useEffect(() => {
+    const handlePopState = () => {
+      const isDetailUrl = /\/(logement|vehicule)\/[^/]+\/\d+/.test(window.location.pathname);
+      if (!isDetailUrl) {
+        setPageRaw("home");
+        setSelectedListing(null);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // 📱 SWIPE (balayage) entre les pages de la barre du bas, comme Instagram
   // On construit la liste des pages visibles dans l'ordre de la barre du bas.
@@ -2911,15 +2951,15 @@ export default function App() {
         <button className="nav-btn mobile-only" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 {t("nav_explore")}</button>
       </nav>
 
-      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} t={t} shareListing={shareListing} />}
+      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={openDetail} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} t={t} shareListing={shareListing} />}
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} t={t} shareListing={shareListing} />}
-      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} t={t} shareListing={shareListing} />}
+      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={openDetail} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} t={t} shareListing={shareListing} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} t={t} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} t={t} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} t={t} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
-      {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} t={t} shareListing={shareListing} /> }
+      {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={openDetail} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} t={t} shareListing={shareListing} /> }
 
       {/* BOTTOM NAV FIXED - Mobile uniquement */}
       <div className="bottom-nav" style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
