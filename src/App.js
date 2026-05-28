@@ -1461,6 +1461,32 @@ const TRANSLATIONS = {
   my_favorites: { fr: "Mes favoris", en: "My favorites", ar: "المفضلة" },
   logout: { fr: "Déconnexion", en: "Logout", ar: "تسجيل الخروج" },
   payment_info: { fr: "Mes infos de paiement", en: "My payment info", ar: "معلومات الدفع" },
+  // Profil détaillé
+  payment_info_sub: { fr: "Pour recevoir vos gains quand un locataire confirme sa réservation.", en: "To receive your earnings when a renter confirms their booking.", ar: "لتلقي أرباحك عند تأكيد المستأجر لحجزه." },
+  bank_account: { fr: "Compte bancaire (RIB)", en: "Bank account (IBAN)", ar: "حساب بنكي" },
+  save_my_info: { fr: "Enregistrer mes infos", en: "Save my info", ar: "حفظ معلوماتي" },
+  info_saved: { fr: "Infos enregistrées", en: "Info saved", ar: "تم حفظ المعلومات" },
+  light_mode: { fr: "Mode clair", en: "Light mode", ar: "الوضع الفاتح" },
+  full_name: { fr: "Nom complet", en: "Full name", ar: "الاسم الكامل" },
+  // Réservation
+  your_info: { fr: "Vos informations", en: "Your information", ar: "معلوماتك" },
+  your_info_sub: { fr: "Vérifiez vos informations pour la réservation.", en: "Check your information for the booking.", ar: "تحقق من معلوماتك للحجز." },
+  step_dates: { fr: "Dates", en: "Dates", ar: "التواريخ" },
+  step_info: { fr: "Infos", en: "Info", ar: "معلومات" },
+  step_payment: { fr: "Paiement", en: "Payment", ar: "الدفع" },
+  email: { fr: "Email", en: "Email", ar: "البريد الإلكتروني" },
+  phone: { fr: "Téléphone", en: "Phone", ar: "الهاتف" },
+  num_people: { fr: "Nombre de personnes", en: "Number of people", ar: "عدد الأشخاص" },
+  id_document: { fr: "Pièce d'identité", en: "ID document", ar: "وثيقة الهوية" },
+  id_number: { fr: "Numéro de la pièce", en: "Document number", ar: "رقم الوثيقة" },
+  message_to_owner: { fr: "Message au propriétaire (optionnel)", en: "Message to owner (optional)", ar: "رسالة للمالك (اختياري)" },
+  total: { fr: "Total", en: "Total", ar: "المجموع" },
+  where_pickup: { fr: "Où voulez-vous récupérer le véhicule ?", en: "Where do you want to pick up the vehicle?", ar: "أين تريد استلام السيارة؟" },
+  delivery_options: { fr: "Options de livraison", en: "Delivery options", ar: "خيارات التوصيل" },
+  free: { fr: "Gratuit", en: "Free", ar: "مجاني" },
+  // Notifications page
+  notifications: { fr: "Notifications", en: "Notifications", ar: "الإشعارات" },
+  no_notifications: { fr: "Aucune notification", en: "No notifications", ar: "لا توجد إشعارات" },
 };
 
 // Helper de traduction global (utilisé par la fonction t() dans App)
@@ -2719,7 +2745,7 @@ export default function App() {
       {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} />}
       {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} t={t} />}
-      {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
+      {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} t={t} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
@@ -2823,11 +2849,11 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
       })()}
       {/* 🏦 INFOS DE PAIEMENT (pour recevoir les versements) */}
       <div className="card" style={{ padding: 18, marginBottom: 16 }}>
-        <h3 style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>🏦 Mes infos de paiement</h3>
-        <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>Pour recevoir vos gains quand un locataire confirme sa réservation.</p>
+        <h3 style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>🏦 {t ? t("payment_info") : "Mes infos de paiement"}</h3>
+        <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>{t ? t("payment_info_sub") : "Pour recevoir vos gains quand un locataire confirme sa réservation."}</p>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={() => setPayMethod("rib")} style={{ flex: 1, padding: 10, borderRadius: 10, border: payMethod === "rib" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: payMethod === "rib" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>🏦 Compte bancaire (RIB)</button>
+          <button onClick={() => setPayMethod("rib")} style={{ flex: 1, padding: 10, borderRadius: 10, border: payMethod === "rib" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: payMethod === "rib" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>🏦 {t ? t("bank_account") : "Compte bancaire (RIB)"}</button>
           <button onClick={() => setPayMethod("wafacash")} style={{ flex: 1, padding: 10, borderRadius: 10, border: payMethod === "wafacash" ? "2px solid #14b8a6" : "2px solid #e5e7eb", background: payMethod === "wafacash" ? "#f0fdfa" : "white", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>💵 Wafacash</button>
         </div>
 
@@ -2844,7 +2870,7 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
           if (payMethod === "rib" && !payRib.trim()) return alert("Entrez votre RIB");
           if (payMethod === "wafacash" && !payWafa.trim()) return alert("Entrez votre numéro Wafacash");
           updatePaymentInfo({ method: payMethod, fullName: payName.trim(), rib: payMethod === "rib" ? payRib.trim() : "", wafacash: payMethod === "wafacash" ? payWafa.trim() : "" });
-        }}>💾 Enregistrer mes infos</button>
+        }}>💾 {t ? t("save_my_info") : "Enregistrer mes infos"}</button>
 
         {user.paymentInfo && (user.paymentInfo.rib || user.paymentInfo.wafacash) && (
           <p style={{ fontSize: 12, color: "#0d9488", marginTop: 10, fontWeight: 600, textAlign: "center" }}>✅ Infos enregistrées ({user.paymentInfo.method === "rib" ? "RIB" : "Wafacash"})</p>
@@ -2883,7 +2909,7 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
           </span>
         </span>
       </button>
-      <button className="btn btn-ghost" style={{ width: "100%", padding: 14 }} onClick={logout}>🚪 Déconnexion</button>
+      <button className="btn btn-ghost" style={{ width: "100%", padding: 14 }} onClick={logout}>🚪 {t ? t("logout") : "Déconnexion"}</button>
     </div>
   );
 }
@@ -4136,18 +4162,19 @@ function MessagesPage({ user, messages, listings, users, setModal, markMessagesR
 }
 
 // ─── NOTIF ───────────────────────────────────────────────────────────
-function NotifPage({ notifications, goToNotif }) {
+function NotifPage({ notifications, goToNotif, t }) {
+  const tr = t || ((k) => k);
   return (
     <div style={{ padding: "16px" }}>
-      <h2 className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>🔔 Notifications</h2>
-      {notifications.length === 0 ? <Empty icon="🔔" msg="Aucune notification" /> :
+      <h2 className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>🔔 {tr("notifications")}</h2>
+      {notifications.length === 0 ? <Empty icon="🔔" msg={tr("no_notifications")} /> :
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {notifications.map(n => (
             <div key={n.id} onClick={() => goToNotif(n)} className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 14, opacity: n.read ? 0.7 : 1, cursor: "pointer", transition: "transform 0.1s" }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={e => e.currentTarget.style.transform = "scale(1)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
               <div style={{ fontSize: 24 }}>{n.type === "new_booking" ? "🎉" : n.type === "commission" ? "💰" : n.type === "moderation" ? "⏳" : n.type === "review" ? "⭐" : n.type === "message" ? "💬" : n.type === "payout" ? "💸" : n.type === "payout_done" ? "✅" : n.type === "exchange" || n.type === "exchange_done" ? "🔑" : "✓"}</div>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 14, fontWeight: n.read ? 400 : 600 }}>{n.message}</p>
-                <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{new Date(n.date).toLocaleString("fr-FR")}</p>
+                <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{new Date(n.date).toLocaleString(tr("nav_home") === "Home" ? "en-US" : tr("nav_home") === "الرئيسية" ? "ar" : "fr-FR")}</p>
               </div>
               <span style={{ color: "#9ca3af", fontSize: 18 }}>›</span>
               {!n.read && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#14b8a6" }} />}
