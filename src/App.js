@@ -1570,6 +1570,10 @@ const TRANSLATIONS = {
   badge_first_trip: { fr: "Premier voyage", en: "First trip", ar: "أول رحلة" },
   badge_traveler: { fr: "Voyageur", en: "Traveler", ar: "مسافر" },
   badge_globetrotter: { fr: "Globetrotteur", en: "Globetrotter", ar: "جوّاب آفاق" },
+  // Partage
+  share: { fr: "Partager", en: "Share", ar: "مشاركة" },
+  copy_link: { fr: "Copier le lien", en: "Copy link", ar: "نسخ الرابط" },
+  link_copied: { fr: "Lien copié !", en: "Link copied!", ar: "تم نسخ الرابط!" },
 };
 
 // Helper de traduction global (utilisé par la fonction t() dans App)
@@ -1908,12 +1912,58 @@ export default function App() {
     }
   }, [listings, user]);
 
+  // 🔗 Détecter un lien partagé (?annonce=ID) et ouvrir l'annonce automatiquement
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const annonceId = params.get("annonce");
+    if (!annonceId) return;
+    // Attendre que les annonces soient chargées
+    if (listings.length === 0) return;
+    const listing = listings.find(l => String(l.id) === String(annonceId));
+    if (listing) {
+      setSelectedListing(listing);
+      setPage("detail");
+    }
+    // Nettoyer l'URL (enlever ?annonce=... pour ne pas réouvrir en boucle)
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, "", cleanUrl);
+  }, [listings]);
+
 
   const reload = () => {
     setListings(DB.get("lcy_listings"));
   };
 
   const flash = (msg, color = "#10b981") => { setToast({ msg, color }); setTimeout(() => setToast(null), 3500); };
+
+  // 🔗 Partager une annonce (menu natif du téléphone OU copie du lien)
+  const shareListing = async (listing) => {
+    if (!listing) return;
+    // Construire le lien vers l'annonce
+    const baseUrl = window.location.origin + window.location.pathname;
+    const url = `${baseUrl}?annonce=${listing.id}`;
+    const typeIcon = getTypeInfo(listing.type)?.icon || "🏠";
+    const shareText = `${typeIcon} ${listing.title} — ${listing.price}€${isLodging(listing.type) ? "/nuit" : "/jour"} à ${listing.city}, ${listing.country}\n\nDécouvrez cette annonce sur Locatzy 👇`;
+    // 📱 Si le menu de partage natif est dispo (téléphone), l'utiliser
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `Locatzy — ${listing.title}`, text: shareText, url: url });
+        return;
+      } catch (e) {
+        // L'utilisateur a annulé le partage : on ne fait rien
+        if (e.name === "AbortError") return;
+      }
+    }
+    // 💻 Sinon (ordinateur) : copier le lien dans le presse-papier
+    try {
+      await navigator.clipboard.writeText(url);
+      flash("🔗 Lien copié ! Vous pouvez le coller où vous voulez.");
+    } catch (e) {
+      // Dernier recours : afficher le lien dans une invite
+      flash(`Lien : ${url}`, "#3b82f6");
+    }
+  };
+
   // Trouver l'id du compte admin (pour lui envoyer les notifs de modération/commission)
   const getAdminId = () => {
     const admin = users.find(u => u.role === "admin");
@@ -2824,15 +2874,15 @@ export default function App() {
         <button className="nav-btn mobile-only" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 {t("nav_explore")}</button>
       </nav>
 
-      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} t={t} />}
-      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} t={t} />}
-      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} t={t} />}
+      {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} t={t} shareListing={shareListing} />}
+      {page === "detail" && selectedListing && <DetailPage listing={selectedListing} user={user} setPage={setPage} goBack={goBack} setModal={setModal} reviews={reviews} bookings={bookings} messages={messages} sendMessage={sendMessage} markMessagesRead={markMessagesRead} onToggleFav={handleToggleFavorite} updateReview={updateReview} deleteReview={deleteReview} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} t={t} shareListing={shareListing} />}
+      {page === "owner" && selectedOwner && <OwnerProfilePage ownerId={selectedOwner} listings={listings} reviews={reviews} bookings={bookings} user={user} setPage={setPage} goBack={goBack} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} setModal={setModal} onToggleFav={handleToggleFavorite} t={t} shareListing={shareListing} />}
       {page === "my" && user && <MyPage myListings={myListings} myBookingsAsRenter={myBookingsAsRenter} bookingsOnMyListings={bookingsOnMyListings} bookings={bookings} setModal={setModal} reviews={reviews} user={user} confirmExchange={confirmExchange} requestPayout={requestPayout} payouts={payouts} debtPayments={debtPayments} setPage={setPage} t={t} />}
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} t={t} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} t={t} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
-      {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} t={t} /> }
+      {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} t={t} shareListing={shareListing} /> }
 
       {/* BOTTOM NAV FIXED - Mobile uniquement */}
       <div className="bottom-nav" style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
@@ -2862,7 +2912,7 @@ function BottomBtn({ icon, label, active, onClick, badge, accent, darkMode }) {
   );
 }
 
-function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggleFav, setModal, openOwner, t }) {
+function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggleFav, setModal, openOwner, t, shareListing }) {
   // Mes favoris : annonces que j'ai aimées et qui sont approuvées
   const myFavIds = favorites.filter(f => f.userId === user.id).map(f => f.listingId);
   const favListings = listings.filter(l => myFavIds.includes(l.id) && l.status === "approved");
@@ -2881,7 +2931,7 @@ function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggl
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {favListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={t} />)}
+          {favListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={t} shareListing={shareListing} />)}
         </div>
       )}
     </div>
@@ -2998,7 +3048,7 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
 }
 
 // ─── HOME ────────────────────────────────────────────────────────────
-function Home({ listings, filter, setFilter, country, setCountry, countries, search, setSearch, setModal, openDetail, openOwner, dateFrom, setDateFrom, dateTo, setDateTo, user, onToggleFav, priceMin, setPriceMin, priceMax, setPriceMax, minRooms, setMinRooms, minGuests, setMinGuests, minRating, setMinRating, wifiOnly, setWifiOnly, fuelFilter, setFuelFilter, transFilter, setTransFilter, vehicleBodyFilter, setVehicleBodyFilter, t }) {
+function Home({ listings, filter, setFilter, country, setCountry, countries, search, setSearch, setModal, openDetail, openOwner, dateFrom, setDateFrom, dateTo, setDateTo, user, onToggleFav, priceMin, setPriceMin, priceMax, setPriceMax, minRooms, setMinRooms, minGuests, setMinGuests, minRating, setMinRating, wifiOnly, setWifiOnly, fuelFilter, setFuelFilter, transFilter, setTransFilter, vehicleBodyFilter, setVehicleBodyFilter, t, shareListing }) {
   const tr = t || ((k) => k); // sécurité si t absent
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [selectedDropdownCountry, setSelectedDropdownCountry] = useState("");
@@ -3315,7 +3365,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
         )}
         <div className="listings-grid" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {listings.length === 0 ? <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 60, color: "#9ca3af" }}><div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div><p>{dateFrom && dateTo ? "Aucune annonce disponible à ces dates" : "Aucune annonce trouvée"}</p>{dateFrom && dateTo && <p style={{ fontSize: 12, marginTop: 8 }}>Essayez d'autres dates</p>}</div>
-          : listings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={tr} />)}
+          : listings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={tr} shareListing={shareListing} />)}
         </div>
       </div>
     </div>
@@ -3323,7 +3373,7 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
 }
 
 // ─── OWNER PROFILE PAGE ──────────────────────────────────────────────
-function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage, goBack, openDetail, setModal, onToggleFav, openOwner, t }) {
+function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage, goBack, openDetail, setModal, onToggleFav, openOwner, t, shareListing }) {
   const users = DB.get("lcy_users");
   const owner = users.find(u => u.id === ownerId);
   if (!owner) {
@@ -3394,7 +3444,7 @@ function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage,
         <Empty icon="📋" msg="Aucune annonce active" />
       ) : (
         <div className="listings-grid" style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
-          {ownerListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={t} />)}
+          {ownerListings.map(l => <ListingCard key={l.id} listing={l} onBook={() => setModal({ type: "book", data: l })} onContact={() => setModal({ type: "contactOwner", data: l })} onOpen={() => openDetail(l)} user={user} onToggleFav={onToggleFav} openOwner={openOwner} t={t} shareListing={shareListing} />)}
         </div>
       )}
 
@@ -3426,7 +3476,7 @@ function OwnerProfilePage({ ownerId, listings, reviews, bookings, user, setPage,
   );
 }
 
-function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav, openOwner, t }) {
+function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav, openOwner, t, shareListing }) {
   const tr = t || ((k) => k);
   const [idx, setIdx] = useState(0);
   const photo = l.photos[idx];
@@ -3487,6 +3537,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 14, borderTop: "1px solid #f0f0f0", gap: 8 }} onClick={e => e.stopPropagation()}>
           <span style={{ fontSize: 12, color: "#6b7280", flex: 1 }}>{tr("by")} <strong onClick={(e) => { e.stopPropagation(); if (openOwner) openOwner(l.ownerId); }} style={{ color: "#14b8a6", cursor: "pointer", textDecoration: "underline" }}>{l.ownerName}</strong></span>
           <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 12 }} onClick={onContact}>💬</button>
+          <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: 12 }} onClick={(e) => { e.stopPropagation(); shareListing && shareListing(l); }} title={tr("share")}>🔗</button>
           <button className="btn btn-primary" style={{ padding: "9px 16px", fontSize: 13 }} onClick={onBook}>{tr("btn_book")}</button>
         </div>
       </div>
@@ -3495,7 +3546,7 @@ function ListingCard({ listing: l, onBook, onContact, onOpen, user, onToggleFav,
 }
 
 // ─── DETAIL PAGE ─────────────────────────────────────────────────────
-function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview, t }) {
+function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, bookings, messages, sendMessage, markMessagesRead, onToggleFav, openOwner, updateReview, deleteReview, t, shareListing }) {
   const tr = t || ((k) => k);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
@@ -3652,6 +3703,7 @@ function DetailPage({ listing: l, user, setPage, goBack, setModal, reviews, book
           )}
           <button className="btn btn-primary" style={{ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }} onClick={() => user ? setModal({ type: "book", data: l }) : setModal({ type: "login" })}>📅 {tr("book_now")}</button>
           <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={() => user ? setModal({ type: "contactOwner", data: l }) : setModal({ type: "login" })}>💬 {tr("contact_owner")}</button>
+          <button className="btn btn-ghost" style={{ width: "100%", padding: 12, fontSize: 14, marginTop: 8, border: "1.5px solid #14b8a6", color: "#0d9488" }} onClick={() => shareListing && shareListing(l)}>🔗 {tr("share")}</button>
           <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10 }}>🛡 {tr("pay_nothing_now")} · {tr("secured_by")}</p>
         </div>
       </div>
