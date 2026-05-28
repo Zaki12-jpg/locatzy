@@ -1591,6 +1591,9 @@ const TRANSLATIONS = {
   share: { fr: "Partager", en: "Share", ar: "مشاركة" },
   copy_link: { fr: "Copier le lien", en: "Copy link", ar: "نسخ الرابط" },
   link_copied: { fr: "Lien copié !", en: "Link copied!", ar: "تم نسخ الرابط!" },
+  // FAQ / Comment ça marche
+  how_it_works: { fr: "Comment ça marche ?", en: "How it works", ar: "كيف يعمل؟" },
+  faq: { fr: "Aide & FAQ", en: "Help & FAQ", ar: "المساعدة والأسئلة" },
 };
 
 // Helper de traduction global (utilisé par la fonction t() dans App)
@@ -1599,6 +1602,58 @@ function translate(key, lang) {
   if (!entry) return key; // si la clé n'existe pas, on retourne la clé (utile pour debug)
   return entry[lang] || entry["fr"] || key;
 }
+
+// ❓ Contenu de la FAQ / Comment ça marche (multilingue)
+const FAQ_CONTENT = {
+  fr: {
+    steps: [
+      { icon: "🔍", title: "1. Cherchez", text: "Parcourez les logements et véhicules disponibles partout dans le monde. Filtrez par pays, ville, prix, dates." },
+      { icon: "📅", title: "2. Réservez", text: "Choisissez vos dates, remplissez vos informations et confirmez. Vous ne payez rien tant que le propriétaire n'a pas accepté." },
+      { icon: "🔑", title: "3. Profitez", text: "Récupérez les clés du logement ou du véhicule (livraison possible à l'aéroport pour les voitures !), puis laissez un avis." },
+    ],
+    questions: [
+      { q: "Comment publier une annonce ?", a: "Créez un compte, puis cliquez sur « Publier mon annonce ». Ajoutez des photos, un prix, une description, et soumettez. Votre annonce sera visible après validation." },
+      { q: "Comment suis-je payé en tant que propriétaire ?", a: "Quand un locataire paie par carte, l'argent est ajouté à votre solde (moins 15% de commission Locatzy). Vous pouvez retirer votre solde vers votre compte bancaire (RIB)." },
+      { q: "Qu'est-ce que la commission ?", a: "Locatzy prend 15% sur chaque réservation pour faire fonctionner la plateforme. Le reste vous revient. Les frais de livraison aéroport vous reviennent à 100%." },
+      { q: "Le paiement est-il sécurisé ?", a: "Oui, tous les paiements par carte passent par Stripe, un système de paiement sécurisé utilisé dans le monde entier." },
+      { q: "Comment contacter un propriétaire ?", a: "Sur la page d'une annonce, cliquez sur « Contacter le propriétaire » pour lui envoyer un message directement." },
+      { q: "Puis-je louer dans un autre pays ?", a: "Oui ! Locatzy fonctionne partout dans le monde. Choisissez le pays dans le filtre en haut de la page d'accueil." },
+      { q: "Livraison de véhicule à l'aéroport ?", a: "Beaucoup de propriétaires proposent de livrer la voiture directement à l'aéroport. Vous verrez l'option et le prix sur la page de l'annonce." },
+    ],
+  },
+  en: {
+    steps: [
+      { icon: "🔍", title: "1. Search", text: "Browse lodgings and vehicles available worldwide. Filter by country, city, price, dates." },
+      { icon: "📅", title: "2. Book", text: "Pick your dates, fill in your info and confirm. You pay nothing until the owner accepts." },
+      { icon: "🔑", title: "3. Enjoy", text: "Pick up the keys to the home or vehicle (airport delivery available for cars!), then leave a review." },
+    ],
+    questions: [
+      { q: "How do I post a listing?", a: "Create an account, then click « Publish my listing ». Add photos, a price, a description, and submit. Your listing will be visible after approval." },
+      { q: "How am I paid as an owner?", a: "When a renter pays by card, the money is added to your balance (minus 15% Locatzy commission). You can withdraw your balance to your bank account." },
+      { q: "What is the commission?", a: "Locatzy takes 15% on each booking to run the platform. The rest is yours. Airport delivery fees are 100% yours." },
+      { q: "Is payment secure?", a: "Yes, all card payments go through Stripe, a secure payment system used worldwide." },
+      { q: "How do I contact an owner?", a: "On a listing page, click « Contact owner » to send them a message directly." },
+      { q: "Can I rent in another country?", a: "Yes! Locatzy works worldwide. Choose the country in the filter at the top of the home page." },
+      { q: "Vehicle delivery at the airport?", a: "Many owners offer to deliver the car directly to the airport. You'll see the option and price on the listing page." },
+    ],
+  },
+  ar: {
+    steps: [
+      { icon: "🔍", title: "١. ابحث", text: "تصفح المساكن والمركبات المتاحة في جميع أنحاء العالم. صفّ حسب الدولة والمدينة والسعر والتواريخ." },
+      { icon: "📅", title: "٢. احجز", text: "اختر تواريخك، املأ معلوماتك وأكّد. لن تدفع شيئًا حتى يوافق المالك." },
+      { icon: "🔑", title: "٣. استمتع", text: "استلم مفاتيح المسكن أو المركبة (التوصيل متاح في المطار للسيارات!)، ثم اترك تقييمًا." },
+    ],
+    questions: [
+      { q: "كيف أنشر إعلانًا؟", a: "أنشئ حسابًا، ثم انقر على «نشر إعلاني». أضف صورًا وسعرًا ووصفًا، ثم أرسل. سيظهر إعلانك بعد الموافقة." },
+      { q: "كيف يتم الدفع لي كمالك؟", a: "عندما يدفع المستأجر بالبطاقة، يُضاف المبلغ إلى رصيدك (مطروحًا منه 15% عمولة Locatzy). يمكنك سحب رصيدك إلى حسابك البنكي." },
+      { q: "ما هي العمولة؟", a: "تأخذ Locatzy 15% من كل حجز لتشغيل المنصة. الباقي لك. رسوم التوصيل للمطار لك بنسبة 100%." },
+      { q: "هل الدفع آمن؟", a: "نعم، جميع المدفوعات بالبطاقة تتم عبر Stripe، وهو نظام دفع آمن مستخدم عالميًا." },
+      { q: "كيف أتواصل مع المالك؟", a: "في صفحة الإعلان، انقر على «تواصل مع المالك» لإرسال رسالة مباشرة." },
+      { q: "هل يمكنني الاستئجار في دولة أخرى؟", a: "نعم! تعمل Locatzy في جميع أنحاء العالم. اختر الدولة من الفلتر أعلى الصفحة الرئيسية." },
+      { q: "توصيل المركبة في المطار؟", a: "يقدم العديد من المالكين توصيل السيارة مباشرة إلى المطار. سترى الخيار والسعر في صفحة الإعلان." },
+    ],
+  },
+};
 
 // ════════════════════════════════════════════════════════════════════
 // APP PRINCIPAL
@@ -1973,7 +2028,7 @@ export default function App() {
     const path = window.location.pathname;
     // Ne rien faire si c'est une URL d'annonce (gérée ailleurs) ou la racine
     if (path === "/" || /\/(logement|vehicule)\/[^/]+\/\d+/.test(path)) return;
-    const mapping = { "/annonces": "my", "/messages": "messages", "/notifications": "notif", "/admin": "admin", "/profil": "profile", "/favoris": "favorites" };
+    const mapping = { "/annonces": "my", "/messages": "messages", "/notifications": "notif", "/admin": "admin", "/profil": "profile", "/favoris": "favorites", "/conditions": "terms", "/confidentialite": "privacy" };
     const targetPage = mapping[path];
     if (targetPage) {
       // Pour les pages qui nécessitent une connexion, on attend que user soit chargé
@@ -2774,6 +2829,8 @@ export default function App() {
     admin: "/admin",
     profile: "/profil",
     favorites: "/favoris",
+    terms: "/conditions",
+    privacy: "/confidentialite",
   };
 
   const setPage = (newPage) => {
@@ -2958,7 +3015,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} t={t} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} t={t} lang={lang} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -2993,6 +3050,8 @@ export default function App() {
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
       {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
       {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={openDetail} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} t={t} shareListing={shareListing} /> }
+      {page === "terms" && <LegalPage type="terms" setPage={setPage} goBack={goBack} darkMode={darkMode} />}
+      {page === "privacy" && <LegalPage type="privacy" setPage={setPage} goBack={goBack} darkMode={darkMode} />}
 
       {/* BOTTOM NAV FIXED - Mobile uniquement */}
       <div className="bottom-nav" style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
@@ -3019,6 +3078,136 @@ function BottomBtn({ icon, label, active, onClick, badge, accent, darkMode }) {
       </span>
       <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{label}</span>
     </button>
+  );
+}
+
+// 📄 PAGE LÉGALE (Conditions d'utilisation OU Politique de confidentialité)
+function LegalPage({ type, setPage, goBack, darkMode }) {
+  const textColor = darkMode ? "#e5e7eb" : "#1a1a1a";
+  const mutedColor = darkMode ? "#9ca3af" : "#6b7280";
+  const lastUpdate = "28 mai 2026";
+
+  const Section = ({ title, children }) => (
+    <div style={{ marginBottom: 22 }}>
+      <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, color: textColor }}>{title}</h3>
+      <div style={{ fontSize: 14, lineHeight: 1.7, color: mutedColor }}>{children}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: "16px", maxWidth: 760, margin: "0 auto" }}>
+      <button onClick={goBack} style={{ background: "none", border: "none", color: "#14b8a6", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 16 }}>← Retour</button>
+
+      {type === "terms" ? (
+        <>
+          <h1 className="display" style={{ fontSize: 26, fontWeight: 800, marginBottom: 6, color: textColor }}>Conditions Générales d'Utilisation</h1>
+          <p style={{ fontSize: 12, color: mutedColor, marginBottom: 24 }}>Dernière mise à jour : {lastUpdate}</p>
+
+          <Section title="1. Présentation de Locatzy">
+            Locatzy est une plateforme de mise en relation entre particuliers permettant la location de logements et de véhicules. Locatzy agit uniquement comme intermédiaire technique entre le propriétaire (qui propose un bien) et le locataire (qui réserve). Locatzy n'est ni propriétaire ni gestionnaire des biens proposés.
+          </Section>
+
+          <Section title="2. Acceptation des conditions">
+            En créant un compte et en utilisant Locatzy, vous acceptez sans réserve les présentes conditions. Si vous n'êtes pas d'accord avec ces conditions, vous ne devez pas utiliser la plateforme.
+          </Section>
+
+          <Section title="3. Inscription et compte">
+            Vous devez avoir au moins 18 ans pour utiliser Locatzy. Vous vous engagez à fournir des informations exactes lors de votre inscription et à garder vos identifiants confidentiels. Vous êtes responsable de toute activité effectuée depuis votre compte.
+          </Section>
+
+          <Section title="4. Rôle des propriétaires">
+            Les propriétaires sont seuls responsables de l'exactitude de leurs annonces (description, photos, prix, disponibilité). Ils s'engagent à proposer des biens conformes à la description et à respecter les réservations confirmées. Les propriétaires doivent disposer des autorisations légales nécessaires pour louer leur bien.
+          </Section>
+
+          <Section title="5. Rôle des locataires">
+            Les locataires s'engagent à utiliser les biens loués de manière responsable, à respecter les règles fixées par le propriétaire et à restituer le bien dans l'état où ils l'ont reçu. Toute dégradation peut engager leur responsabilité auprès du propriétaire.
+          </Section>
+
+          <Section title="6. Paiements et commission">
+            Les paiements par carte sont traités de façon sécurisée par notre partenaire Stripe. Locatzy prélève une commission de 15% sur le montant de chaque location confirmée. Les frais de livraison éventuels (pour les véhicules) reviennent intégralement au propriétaire. Le détail des montants est affiché avant toute confirmation de réservation.
+          </Section>
+
+          <Section title="7. Annulations">
+            Les conditions d'annulation peuvent varier selon les accords entre le propriétaire et le locataire. En cas de litige, Locatzy peut intervenir en médiation mais ne garantit pas le remboursement automatique.
+          </Section>
+
+          <Section title="8. Responsabilité">
+            Locatzy met tout en œuvre pour assurer le bon fonctionnement de la plateforme mais ne peut être tenu responsable des litiges entre utilisateurs, des dommages causés aux biens, ou de la qualité réelle des biens loués. La relation contractuelle de location se noue directement entre le propriétaire et le locataire.
+          </Section>
+
+          <Section title="9. Contenus interdits">
+            Il est interdit de publier des annonces fausses, frauduleuses, illégales ou trompeuses. Locatzy se réserve le droit de suspendre ou supprimer tout compte ou annonce ne respectant pas ces règles, sans préavis.
+          </Section>
+
+          <Section title="10. Modification des conditions">
+            Locatzy se réserve le droit de modifier ces conditions à tout moment. Les utilisateurs seront informés des changements importants. L'utilisation continue de la plateforme vaut acceptation des nouvelles conditions.
+          </Section>
+
+          <Section title="11. Contact">
+            Pour toute question concernant ces conditions, contactez-nous à : <strong>[À COMPLÉTER : votre email de contact]</strong>.
+            <br /><br />
+            Éditeur : <strong>[À COMPLÉTER : nom de votre société/entreprise]</strong><br />
+            Adresse : <strong>[À COMPLÉTER : votre adresse]</strong>
+          </Section>
+        </>
+      ) : (
+        <>
+          <h1 className="display" style={{ fontSize: 26, fontWeight: 800, marginBottom: 6, color: textColor }}>Politique de Confidentialité</h1>
+          <p style={{ fontSize: 12, color: mutedColor, marginBottom: 24 }}>Dernière mise à jour : {lastUpdate}</p>
+
+          <Section title="1. Introduction">
+            Cette politique explique quelles données personnelles Locatzy collecte, pourquoi, et comment elles sont protégées. Nous nous engageons à respecter votre vie privée et la réglementation applicable (notamment le RGPD pour les utilisateurs européens).
+          </Section>
+
+          <Section title="2. Données que nous collectons">
+            Nous collectons les informations que vous nous fournissez : nom, adresse email, numéro de téléphone, pièce d'identité (pour les réservations), informations de paiement (traitées par Stripe, jamais stockées par nous), et le contenu de vos annonces et messages. Nous collectons aussi des données techniques (type d'appareil, langue).
+          </Section>
+
+          <Section title="3. Pourquoi nous utilisons vos données">
+            Vos données servent à : créer et gérer votre compte, permettre les réservations et la mise en relation, traiter les paiements, vous envoyer des notifications importantes, assurer la sécurité de la plateforme et lutter contre la fraude.
+          </Section>
+
+          <Section title="4. Partage des données">
+            Vos données ne sont jamais vendues. Elles sont partagées uniquement avec : les autres utilisateurs dans le cadre d'une réservation (ex : le propriétaire voit le nom et le contact du locataire), notre prestataire de paiement Stripe, et notre hébergeur. Nous ne partageons vos données qu'avec votre consentement ou si la loi l'exige.
+          </Section>
+
+          <Section title="5. Stockage et sécurité">
+            Vos données sont stockées de façon sécurisée via Firebase (Google). Nous mettons en place des mesures techniques pour protéger vos informations contre tout accès non autorisé. Les informations de paiement sont gérées exclusivement par Stripe selon les normes de sécurité bancaire.
+          </Section>
+
+          <Section title="6. Vos droits">
+            Conformément au RGPD, vous avez le droit d'accéder à vos données, de les corriger, de les supprimer, et de vous opposer à leur traitement. Vous pouvez désactiver votre compte à tout moment depuis votre profil. Pour exercer ces droits, contactez-nous.
+          </Section>
+
+          <Section title="7. Cookies et stockage local">
+            L'application utilise le stockage local de votre appareil pour mémoriser vos préférences (langue, mode sombre, connexion). Aucune donnée publicitaire n'est collectée. Locatzy ne diffuse pas de publicité.
+          </Section>
+
+          <Section title="8. Conservation des données">
+            Nous conservons vos données tant que votre compte est actif. Si vous supprimez votre compte, vos données personnelles sont effacées, sauf celles que la loi nous oblige à conserver (ex : historique des transactions à des fins comptables).
+          </Section>
+
+          <Section title="9. Mineurs">
+            Locatzy n'est pas destiné aux personnes de moins de 18 ans. Nous ne collectons pas sciemment de données concernant des mineurs.
+          </Section>
+
+          <Section title="10. Contact">
+            Pour toute question sur vos données personnelles ou pour exercer vos droits, contactez notre responsable de la protection des données à : <strong>[À COMPLÉTER : votre email de contact]</strong>.
+            <br /><br />
+            Responsable du traitement : <strong>[À COMPLÉTER : nom de votre société/entreprise]</strong>
+          </Section>
+        </>
+      )}
+
+      <div style={{ marginTop: 30, paddingTop: 20, borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button onClick={() => setPage(type === "terms" ? "privacy" : "terms")} style={{ background: "none", border: "1.5px solid #14b8a6", color: "#0d9488", padding: "10px 16px", borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+          {type === "terms" ? "📄 Voir la Politique de Confidentialité" : "📄 Voir les Conditions d'Utilisation"}
+        </button>
+        <button onClick={() => setPage("home")} style={{ background: "#14b8a6", border: "none", color: "white", padding: "10px 16px", borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+          🏠 Retour à l'accueil
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -3125,6 +3314,11 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
         <span>›</span>
       </button>
 
+      <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setModal({ type: "faq" })}>
+        <span>❓ {t ? t("how_it_works") : "Comment ça marche ?"}</span>
+        <span>›</span>
+      </button>
+
       {/* 🌍 SÉLECTEUR DE LANGUE */}
       <div style={{ marginBottom: 10, padding: 14, border: "1px solid #e5e7eb", borderRadius: 12, background: darkMode ? "#1a1a1a" : "white" }}>
         <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>🌍 {t ? t("language") : "Langue"}</p>
@@ -3153,6 +3347,15 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
         </span>
       </button>
       <button className="btn btn-ghost" style={{ width: "100%", padding: 14 }} onClick={logout}>🚪 {t ? t("logout") : "Déconnexion"}</button>
+
+      {/* Liens légaux */}
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", textAlign: "center" }}>
+        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+          <button onClick={() => setPage("terms")} style={{ background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>Conditions d'utilisation</button>
+          <button onClick={() => setPage("privacy")} style={{ background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>Politique de confidentialité</button>
+        </div>
+        <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 10 }}>© 2026 Locatzy · Tous droits réservés</p>
+      </div>
     </div>
   );
 }
@@ -4731,7 +4934,7 @@ function SearchableSelect({ options, value, onChange, placeholder = "— Choisir
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry, t }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry, t, lang }) {
   const [form, setForm] = useState({});
   const tr = t || ((k) => k);
   const [photos, setPhotos] = useState([]);
@@ -4775,6 +4978,47 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
     <div className="overlay" onClick={e => e.target === e.currentTarget && close()}>
       <div className="modal">
         <button onClick={close} style={{ position: "absolute", top: 18, right: 18, background: "#f3f4f6", borderRadius: "50%", width: 34, height: 34, fontSize: 18, fontWeight: 600, zIndex: 5 }}>×</button>
+
+        {modal.type === "faq" && (() => {
+          const content = FAQ_CONTENT[lang] || FAQ_CONTENT.fr;
+          return (
+            <div>
+              <h2 className="display" style={{ fontWeight: 800, fontSize: 24, marginBottom: 6 }}>❓ {tr("how_it_works")}</h2>
+              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>Locatzy</p>
+
+              {/* Les 3 étapes */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+                {content.steps.map((s, i) => (
+                  <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "#f0fdfa", borderRadius: 14, padding: 14 }}>
+                    <span style={{ fontSize: 30 }}>{s.icon}</span>
+                    <div>
+                      <h3 style={{ fontWeight: 700, fontSize: 15, marginBottom: 3 }}>{s.title}</h3>
+                      <p style={{ fontSize: 13, color: "#6b7280" }}>{s.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Questions fréquentes (accordéon) */}
+              <h3 style={{ fontWeight: 800, fontSize: 18, marginBottom: 12 }}>💬 FAQ</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {content.questions.map((item, i) => (
+                  <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+                    <button onClick={() => set("faqOpen", form.faqOpen === i ? null : i)} style={{ width: "100%", textAlign: "start", padding: 14, background: form.faqOpen === i ? "#f0fdfa" : "white", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                      <span>{item.q}</span>
+                      <span style={{ color: "#14b8a6", flexShrink: 0 }}>{form.faqOpen === i ? "−" : "+"}</span>
+                    </button>
+                    {form.faqOpen === i && (
+                      <div style={{ padding: "0 14px 14px", fontSize: 13, color: "#4b5563", lineHeight: 1.6 }}>{item.a}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button className="btn btn-primary" style={{ width: "100%", padding: 14, marginTop: 20 }} onClick={() => setModal(null)}>{tr("btn_close")}</button>
+            </div>
+          );
+        })()}
 
         {modal.type === "explore" && (() => {
           const approved = listings.filter(l => l.status === "approved");
