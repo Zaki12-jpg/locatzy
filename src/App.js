@@ -1408,6 +1408,69 @@ const isLodging = (type) => getTypeInfo(type)?.category === "lodging";
 const isVehicle = (type) => getTypeInfo(type)?.category === "vehicle";
 
 // ════════════════════════════════════════════════════════════════════
+// 🌍 SYSTÈME MULTILINGUE (Français / English / العربية)
+// ════════════════════════════════════════════════════════════════════
+const LANGUAGES = [
+  { code: "fr", label: "Français", flag: "🇫🇷", dir: "ltr" },
+  { code: "en", label: "English", flag: "🇬🇧", dir: "ltr" },
+  { code: "ar", label: "العربية", flag: "🇸🇦", dir: "rtl" },
+];
+
+// Dictionnaire de traductions. Clés = identifiants ; valeurs = { fr, en, ar }
+const TRANSLATIONS = {
+  // Navigation
+  nav_home: { fr: "Accueil", en: "Home", ar: "الرئيسية" },
+  nav_listings: { fr: "Annonces", en: "Listings", ar: "الإعلانات" },
+  nav_messages: { fr: "Messages", en: "Messages", ar: "الرسائل" },
+  nav_notif: { fr: "Notif", en: "Alerts", ar: "الإشعارات" },
+  nav_admin: { fr: "Admin", en: "Admin", ar: "الإدارة" },
+  nav_explore: { fr: "Explorer", en: "Explore", ar: "استكشاف" },
+  nav_profile: { fr: "Profil", en: "Profile", ar: "الملف الشخصي" },
+  nav_login: { fr: "Connexion", en: "Login", ar: "تسجيل الدخول" },
+  // Page d'accueil
+  home_subtitle: { fr: "Trouvez le logement ou le véhicule parfait", en: "Find the perfect home or vehicle", ar: "اعثر على المنزل أو السيارة المثالية" },
+  search_placeholder: { fr: "Rechercher une ville, un pays...", en: "Search a city, country...", ar: "ابحث عن مدينة، دولة..." },
+  filter_all: { fr: "Tout", en: "All", ar: "الكل" },
+  filters: { fr: "Filtres", en: "Filters", ar: "الفلاتر" },
+  reset: { fr: "Réinitialiser", en: "Reset", ar: "إعادة تعيين" },
+  apply: { fr: "Appliquer", en: "Apply", ar: "تطبيق" },
+  // Espace perso
+  my_space: { fr: "Mon espace", en: "My space", ar: "مساحتي" },
+  my_space_sub: { fr: "Gérez vos annonces, vos réservations et suivez vos gains.", en: "Manage your listings, bookings and track your earnings.", ar: "أدر إعلاناتك وحجوزاتك وتابع أرباحك." },
+  my_listings: { fr: "Mes annonces", en: "My listings", ar: "إعلاناتي" },
+  received_bookings: { fr: "Réservations reçues", en: "Bookings received", ar: "الحجوزات المستلمة" },
+  my_earnings: { fr: "Mes gains", en: "My earnings", ar: "أرباحي" },
+  my_balance: { fr: "Mon solde", en: "My balance", ar: "رصيدي" },
+  new_listing: { fr: "Nouvelle annonce", en: "New listing", ar: "إعلان جديد" },
+  received: { fr: "Reçues", en: "Received", ar: "المستلمة" },
+  my_bookings: { fr: "Mes réservations", en: "My bookings", ar: "حجوزاتي" },
+  // Boutons généraux
+  btn_book: { fr: "Réserver", en: "Book", ar: "احجز" },
+  btn_continue: { fr: "Continuer", en: "Continue", ar: "متابعة" },
+  btn_cancel: { fr: "Annuler", en: "Cancel", ar: "إلغاء" },
+  btn_confirm: { fr: "Confirmer", en: "Confirm", ar: "تأكيد" },
+  btn_close: { fr: "Fermer", en: "Close", ar: "إغلاق" },
+  btn_back: { fr: "Retour", en: "Back", ar: "رجوع" },
+  btn_save: { fr: "Enregistrer", en: "Save", ar: "حفظ" },
+  btn_delete: { fr: "Supprimer", en: "Delete", ar: "حذف" },
+  btn_edit: { fr: "Modifier", en: "Edit", ar: "تعديل" },
+  // Profil / réglages
+  settings: { fr: "Réglages", en: "Settings", ar: "الإعدادات" },
+  language: { fr: "Langue", en: "Language", ar: "اللغة" },
+  dark_mode: { fr: "Mode sombre", en: "Dark mode", ar: "الوضع الداكن" },
+  my_favorites: { fr: "Mes favoris", en: "My favorites", ar: "المفضلة" },
+  logout: { fr: "Déconnexion", en: "Logout", ar: "تسجيل الخروج" },
+  payment_info: { fr: "Mes infos de paiement", en: "My payment info", ar: "معلومات الدفع" },
+};
+
+// Helper de traduction global (utilisé par la fonction t() dans App)
+function translate(key, lang) {
+  const entry = TRANSLATIONS[key];
+  if (!entry) return key; // si la clé n'existe pas, on retourne la clé (utile pour debug)
+  return entry[lang] || entry["fr"] || key;
+}
+
+// ════════════════════════════════════════════════════════════════════
 // APP PRINCIPAL
 // ════════════════════════════════════════════════════════════════════
 export default function App() {
@@ -1429,6 +1492,28 @@ export default function App() {
   const [payouts, setPayouts] = useState([]);
   const [debtPayments, setDebtPayments] = useState([]);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("lcy_dark") === "true");
+  // 🌍 Langue de l'interface (fr par défaut)
+  const [lang, setLang] = useState(() => localStorage.getItem("lcy_lang") || "fr");
+  // Fonction de traduction : t("nav_home") → "Accueil" / "Home" / "الرئيسية"
+  const t = (key) => translate(key, lang);
+  // Changer de langue + sauvegarder + appliquer le sens (RTL pour l'arabe)
+  const changeLang = (newLang) => {
+    setLang(newLang);
+    localStorage.setItem("lcy_lang", newLang);
+    const langInfo = LANGUAGES.find(l => l.code === newLang);
+    if (langInfo) {
+      document.documentElement.dir = langInfo.dir; // ltr ou rtl
+      document.documentElement.lang = newLang;
+    }
+  };
+  // Appliquer le sens dès le chargement
+  useEffect(() => {
+    const langInfo = LANGUAGES.find(l => l.code === lang);
+    if (langInfo) {
+      document.documentElement.dir = langInfo.dir;
+      document.documentElement.lang = lang;
+    }
+  }, [lang]);
   
   const toggleDarkMode = () => {
     const newVal = !darkMode;
@@ -2617,17 +2702,17 @@ export default function App() {
 
         {/* NAV DESKTOP - Visible uniquement sur PC */}
         <div className="desktop-nav" style={{ alignItems: "center", gap: 6 }}>
-          <button className="nav-btn" onClick={() => setPage("home")} style={{ fontWeight: page === "home" ? 700 : 500, color: page === "home" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined }}>🏠 Accueil</button>
-          {user && <button className="nav-btn" onClick={() => setPage("my")} style={{ fontWeight: page === "my" ? 700 : 500, color: page === "my" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined }}>📋 Annonces</button>}
-          {user && <button className="nav-btn" onClick={() => setPage("messages")} style={{ fontWeight: page === "messages" ? 700 : 500, color: page === "messages" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined, position: "relative" }}>💬 Messages{unreadMessagesCount > 0 && <span style={{ position: "absolute", top: 2, right: 2, background: "#ef4444", color: "white", borderRadius: 50, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{unreadMessagesCount}</span>}</button>}
-          {user && <button className="nav-btn" onClick={() => { setPage("notif"); markAllRead(); }} style={{ fontWeight: page === "notif" ? 700 : 500, color: page === "notif" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined, position: "relative" }}>🔔 Notif{unreadCount > 0 && <span style={{ position: "absolute", top: 2, right: 2, background: "#ef4444", color: "white", borderRadius: 50, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{unreadCount}</span>}</button>}
-          {user?.role === "admin" && <button className="nav-btn" onClick={() => setPage("admin")} style={{ fontWeight: page === "admin" ? 700 : 500, color: "#14b8a6" }}>⚡ Admin</button>}
-          <button className="nav-btn" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 600 }}>🌍 Explorer</button>
-          <button className="nav-btn" onClick={() => user ? setPage("profile") : setModal({ type: "login" })} style={{ background: user ? (darkMode ? "#14b8a6" : "#0a0a0a") : "#14b8a6", color: "white", fontWeight: 700, marginLeft: 8 }}>{user ? `👤 ${user.name}` : "🔑 Connexion"}</button>
+          <button className="nav-btn" onClick={() => setPage("home")} style={{ fontWeight: page === "home" ? 700 : 500, color: page === "home" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined }}>🏠 {t("nav_home")}</button>
+          {user && <button className="nav-btn" onClick={() => setPage("my")} style={{ fontWeight: page === "my" ? 700 : 500, color: page === "my" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined }}>📋 {t("nav_listings")}</button>}
+          {user && <button className="nav-btn" onClick={() => setPage("messages")} style={{ fontWeight: page === "messages" ? 700 : 500, color: page === "messages" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined, position: "relative" }}>💬 {t("nav_messages")}{unreadMessagesCount > 0 && <span style={{ position: "absolute", top: 2, right: 2, background: "#ef4444", color: "white", borderRadius: 50, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{unreadMessagesCount}</span>}</button>}
+          {user && <button className="nav-btn" onClick={() => { setPage("notif"); markAllRead(); }} style={{ fontWeight: page === "notif" ? 700 : 500, color: page === "notif" ? (darkMode ? "#14b8a6" : "#0a0a0a") : undefined, position: "relative" }}>🔔 {t("nav_notif")}{unreadCount > 0 && <span style={{ position: "absolute", top: 2, right: 2, background: "#ef4444", color: "white", borderRadius: 50, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>{unreadCount}</span>}</button>}
+          {user?.role === "admin" && <button className="nav-btn" onClick={() => setPage("admin")} style={{ fontWeight: page === "admin" ? 700 : 500, color: "#14b8a6" }}>⚡ {t("nav_admin")}</button>}
+          <button className="nav-btn" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 600 }}>🌍 {t("nav_explore")}</button>
+          <button className="nav-btn" onClick={() => user ? setPage("profile") : setModal({ type: "login" })} style={{ background: user ? (darkMode ? "#14b8a6" : "#0a0a0a") : "#14b8a6", color: "white", fontWeight: 700, marginLeft: 8 }}>{user ? `👤 ${user.name}` : `🔑 ${t("nav_login")}`}</button>
         </div>
 
         {/* BOUTON EXPLORER MOBILE */}
-        <button className="nav-btn mobile-only" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 Explorer</button>
+        <button className="nav-btn mobile-only" onClick={() => setModal({ type: "explore" })} style={{ fontWeight: 700 }}>🌍 {t("nav_explore")}</button>
       </nav>
 
       {page === "home" && <Home listings={visible} filter={filter} setFilter={setFilter} country={country} setCountry={setCountry} countries={[...new Set(listings.filter(l => l.status === "approved").map(l => l.country))]} search={search} setSearch={setSearch} setModal={setModal} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo} user={user} onToggleFav={handleToggleFavorite} priceMin={priceMin} setPriceMin={setPriceMin} priceMax={priceMax} setPriceMax={setPriceMax} minRooms={minRooms} setMinRooms={setMinRooms} minGuests={minGuests} setMinGuests={setMinGuests} minRating={minRating} setMinRating={setMinRating} wifiOnly={wifiOnly} setWifiOnly={setWifiOnly} fuelFilter={fuelFilter} setFuelFilter={setFuelFilter} transFilter={transFilter} setTransFilter={setTransFilter} vehicleBodyFilter={vehicleBodyFilter} setVehicleBodyFilter={setVehicleBodyFilter} />}
@@ -2637,17 +2722,17 @@ export default function App() {
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} />}
-      {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} />}
+      {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
       {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={(l) => { setSelectedListing(l); setPage("detail"); }} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} /> }
 
       {/* BOTTOM NAV FIXED - Mobile uniquement */}
       <div className="bottom-nav" style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
-        <BottomBtn icon="🏠" label="Accueil" active={page === "home"} onClick={() => setPage("home")} darkMode={darkMode} />
-        {user && <BottomBtn icon="📋" label="Annonces" active={page === "my"} onClick={() => setPage("my")} darkMode={darkMode} />}
-        {user && <BottomBtn icon="💬" label="Messages" active={page === "messages"} badge={unreadMessagesCount} onClick={() => setPage("messages")} darkMode={darkMode} />}
-        {user && <BottomBtn icon="🔔" label="Notif" active={page === "notif"} badge={unreadCount} onClick={() => { setPage("notif"); markAllRead(); }} darkMode={darkMode} />}
-        {user?.role === "admin" && <BottomBtn icon="⚡" label="Admin" active={page === "admin"} onClick={() => setPage("admin")} accent darkMode={darkMode} />}
-        <BottomBtn icon={user ? "👤" : "🔑"} label={user ? "Profil" : "Connexion"} active={page === "profile"} onClick={() => user ? setPage("profile") : setModal({ type: "login" })} darkMode={darkMode} />
+        <BottomBtn icon="🏠" label={t("nav_home")} active={page === "home"} onClick={() => setPage("home")} darkMode={darkMode} />
+        {user && <BottomBtn icon="📋" label={t("nav_listings")} active={page === "my"} onClick={() => setPage("my")} darkMode={darkMode} />}
+        {user && <BottomBtn icon="💬" label={t("nav_messages")} active={page === "messages"} badge={unreadMessagesCount} onClick={() => setPage("messages")} darkMode={darkMode} />}
+        {user && <BottomBtn icon="🔔" label={t("nav_notif")} active={page === "notif"} badge={unreadCount} onClick={() => { setPage("notif"); markAllRead(); }} darkMode={darkMode} />}
+        {user?.role === "admin" && <BottomBtn icon="⚡" label={t("nav_admin")} active={page === "admin"} onClick={() => setPage("admin")} accent darkMode={darkMode} />}
+        <BottomBtn icon={user ? "👤" : "🔑"} label={user ? t("nav_profile") : t("nav_login")} active={page === "profile"} onClick={() => user ? setPage("profile") : setModal({ type: "login" })} darkMode={darkMode} />
       </div>
       </div>
     </div>
@@ -2694,7 +2779,7 @@ function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggl
   );
 }
 
-function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode, updatePaymentInfo }) {
+function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode, updatePaymentInfo, lang, changeLang, t }) {
   if (!user) return null;
   const [payMethod, setPayMethod] = useState(user.paymentInfo?.method || "rib");
   const [payName, setPayName] = useState(user.paymentInfo?.fullName || "");
@@ -2767,11 +2852,31 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
       </div>
 
       <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setPage("favorites")}>
-        <span>❤️ Mes favoris</span>
+        <span>❤️ {t ? t("my_favorites") : "Mes favoris"}</span>
         <span>›</span>
       </button>
+
+      {/* 🌍 SÉLECTEUR DE LANGUE */}
+      <div style={{ marginBottom: 10, padding: 14, border: "1px solid #e5e7eb", borderRadius: 12, background: darkMode ? "#1a1a1a" : "white" }}>
+        <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>🌍 {t ? t("language") : "Langue"}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          {LANGUAGES.map(l => (
+            <button key={l.code} onClick={() => changeLang(l.code)} style={{
+              padding: "10px 6px", borderRadius: 10,
+              border: lang === l.code ? "2px solid #14b8a6" : "2px solid #e5e7eb",
+              background: lang === l.code ? "#f0fdfa" : (darkMode ? "#0f0f0f" : "white"),
+              color: darkMode && lang !== l.code ? "#e5e7eb" : "#0a0a0a",
+              fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4
+            }}>
+              <span style={{ fontSize: 22 }}>{l.flag}</span>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={toggleDarkMode}>
-        <span>{darkMode ? "☀️ Mode clair" : "🌙 Mode sombre"}</span>
+        <span>{darkMode ? "☀️ Mode clair" : `🌙 ${t ? t("dark_mode") : "Mode sombre"}`}</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 36, height: 20, background: darkMode ? "#14b8a6" : "#d1d5db", borderRadius: 50, position: "relative", transition: "all 0.2s" }}>
             <span style={{ position: "absolute", top: 2, left: darkMode ? 18 : 2, width: 16, height: 16, background: "white", borderRadius: "50%", transition: "all 0.2s" }} />
