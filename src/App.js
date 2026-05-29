@@ -2657,6 +2657,38 @@ export default function App() {
   const deleteListing = async (fbId) => { try { await deleteDoc(doc(db, "listings", fbId)); flash("Annonce supprimée", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
   const deleteUser = async (fbId) => { try { await deleteDoc(doc(db, "users", fbId)); flash("Utilisateur supprimé", "#ef4444"); } catch (e) { flash("Erreur", "#ef4444"); } };
 
+  // 🗑️ SUPPRESSION DU COMPTE PAR L'UTILISATEUR LUI-MÊME (RGPD + Google Play)
+  const deleteAccount = async (emailSaisi, passwordSaisi) => {
+    if (!user) return { ok: false, error: "Vous devez être connecté" };
+    // 1) Vérifier l'email
+    if (!emailSaisi || emailSaisi.trim().toLowerCase() !== (user.email || "").toLowerCase()) {
+      return { ok: false, error: "Email incorrect" };
+    }
+    // 2) Vérifier le mot de passe
+    if (!passwordSaisi || passwordSaisi !== user.password) {
+      return { ok: false, error: "Mot de passe incorrect" };
+    }
+    // 3) Confirmation supplémentaire avant suppression définitive
+    try {
+      const fbId = user.fbId || user.id;
+      // Envoyer email confirmation à l'admin
+      sendEmail("blackberrywalid72@gmail.com", `[Suppression compte] ${user.name}`, `L'utilisateur ${user.name} (${user.email}) a supprimé son compte Locatzy le ${new Date().toLocaleString("fr-FR")}.`);
+      // Envoyer email confirmation à l'utilisateur
+      sendEmail(user.email, "Votre compte Locatzy a été supprimé", `Bonjour ${user.name},\n\nVotre compte Locatzy a bien été supprimé.\nNous sommes désolés de vous voir partir.\n\nL'équipe Locatzy`);
+      // Supprimer le document Firebase de l'utilisateur
+      await deleteDoc(doc(db, "users", fbId));
+      // Déconnecter et nettoyer le local
+      setUser(null);
+      localStorage.removeItem("lcy_session");
+      setPage("home");
+      flash("✅ Votre compte a été supprimé définitivement", "#ef4444");
+      return { ok: true };
+    } catch (e) {
+      console.log("Erreur deleteAccount:", e);
+      return { ok: false, error: "Erreur lors de la suppression. Réessayez." };
+    }
+  };
+
   const visible = listings.filter(l => {
     if (l.status !== "approved") return false;
     // 🚫 Si le proprio est désactivé (solde négatif depuis +7j), cacher ses annonces aux clients
@@ -2956,6 +2988,7 @@ export default function App() {
     favorites: "/favoris",
     terms: "/conditions",
     privacy: "/confidentialite",
+    howitworks: "/comment-ca-marche",
   };
 
   const setPage = (newPage) => {
@@ -3140,7 +3173,7 @@ export default function App() {
 
       {toast && <div style={{ position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", background: toast.color, color: "white", padding: "12px 20px", borderRadius: 12, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 10px 30px rgba(0,0,0,0.2)", animation: "slideIn 0.3s ease", maxWidth: 360, width: "calc(100% - 32px)", textAlign: "center" }}>{toast.msg}</div>}
 
-      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} t={t} lang={lang} submitIdentity={submitIdentity} />}
+      {modal && <Modal modal={modal} setModal={setModal} login={login} register={register} verifyEmailCode={verifyEmailCode} resendVerifyCode={resendVerifyCode} sendResetCode={sendResetCode} resetPassword={resetPassword} addListing={addListing} updateListing={updateListing} updateBlockedDates={updateBlockedDates} book={book} payerAvecStripe={payerAvecStripe} user={user} setPage={setPage} setCountry={setCountry} setSearch={setSearch} setFilter={setFilter} listings={listings} reviews={reviews} messages={messages} sendMessage={sendMessage} addReview={addReview} updateReview={updateReview} markMessagesRead={markMessagesRead} bookings={bookings} flash={flash} customLodgingTypes={customLodgingTypes} addLodgingType={addLodgingType} payouts={payouts} requestWithdrawal={requestWithdrawal} debtPayments={debtPayments} payerDetteAvecStripe={payerDetteAvecStripe} declareDebtPayment={declareDebtPayment} customAirports={customAirports} addCustomAirport={addCustomAirport} getAirportsForCountry={getAirportsForCountry} t={t} lang={lang} submitIdentity={submitIdentity} deleteAccount={deleteAccount} />}
 
       <nav style={{ background: darkMode ? "#0f0f0f" : "white", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, borderBottom: darkMode ? "1px solid #2a2a2a" : "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
@@ -3173,10 +3206,11 @@ export default function App() {
       {page === "notif" && user && <NotifPage notifications={myNotifications} goToNotif={goToNotif} t={t} />}
       {page === "messages" && user && <MessagesPage user={user} messages={myMessages} listings={listings} users={users} setModal={setModal} markMessagesRead={markMessagesRead} t={t} />}
       {page === "admin" && user?.role === "admin" && <Admin listings={listings} bookings={bookings} users={users} approveListing={approveListing} rejectListing={rejectListing} deleteListing={deleteListing} deleteUser={deleteUser} reviews={reviews} payouts={payouts} markPayoutPaid={markPayoutPaid} debtPayments={debtPayments} confirmDebtPayment={confirmDebtPayment} setIdentityStatus={setIdentityStatus} />}
-      {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} />}
+      {page === "profile" && <ProfilePage user={user} setPage={setPage} setModal={setModal} logout={logout} darkMode={darkMode} toggleDarkMode={toggleDarkMode} updatePaymentInfo={updatePaymentInfo} lang={lang} changeLang={changeLang} t={t} deleteAccount={deleteAccount} />}
       {page === "favorites" && user && <FavoritesPage user={user} listings={listings} favorites={favorites} setPage={setPage} openDetail={openDetail} openOwner={(ownerId) => { setSelectedOwner(ownerId); setPage("owner"); }} onToggleFav={handleToggleFavorite} setModal={setModal} t={t} shareListing={shareListing} /> }
       {page === "terms" && <LegalPage type="terms" setPage={setPage} goBack={goBack} darkMode={darkMode} />}
       {page === "privacy" && <LegalPage type="privacy" setPage={setPage} goBack={goBack} darkMode={darkMode} />}
+      {page === "howitworks" && <HowItWorksPage goBack={goBack} darkMode={darkMode} lang={lang} t={t} />}
 
       {/* BOTTOM NAV FIXED - Mobile uniquement */}
       <div className="bottom-nav" style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", background: darkMode ? "#0f0f0f" : "white", borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -2px 16px rgba(0,0,0,0.04)", zIndex: 90 }}>
@@ -3362,7 +3396,7 @@ function FavoritesPage({ user, listings, favorites, setPage, openDetail, onToggl
   );
 }
 
-function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode, updatePaymentInfo, lang, changeLang, t }) {
+function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode, updatePaymentInfo, lang, changeLang, t, deleteAccount }) {
   if (!user) return null;
   const [payMethod, setPayMethod] = useState(user.paymentInfo?.method || "rib");
   const [payName, setPayName] = useState(user.paymentInfo?.fullName || "");
@@ -3439,7 +3473,7 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
         <span>›</span>
       </button>
 
-      <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setModal({ type: "faq" })}>
+      <button className="btn btn-ghost" style={{ width: "100%", padding: 14, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setPage("howitworks")}>
         <span>❓ {t ? t("how_it_works") : "Comment ça marche ?"}</span>
         <span>›</span>
       </button>
@@ -3483,6 +3517,20 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
       </button>
       <button className="btn btn-ghost" style={{ width: "100%", padding: 14 }} onClick={logout}>🚪 {t ? t("logout") : "Déconnexion"}</button>
 
+      {/* 🗑️ ZONE DANGER : Suppression définitive du compte */}
+      <div style={{ marginTop: 24, padding: 16, border: "2px solid #fee2e2", borderRadius: 12, background: darkMode ? "#1a0a0a" : "#fef2f2" }}>
+        <h4 style={{ fontWeight: 800, fontSize: 14, color: "#dc2626", marginBottom: 6 }}>⚠️ Zone dangereuse</h4>
+        <p style={{ fontSize: 12, color: darkMode ? "#fca5a5" : "#7f1d1d", marginBottom: 12, lineHeight: 1.5 }}>
+          La suppression de votre compte est définitive. Toutes vos données (profil, annonces, messages, réservations) seront supprimées et ne pourront pas être récupérées.
+        </p>
+        <button
+          onClick={() => setModal({ type: "deleteAccount" })}
+          style={{ width: "100%", padding: 12, background: "#dc2626", color: "white", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+        >
+          🗑️ Supprimer définitivement mon compte
+        </button>
+      </div>
+
       {/* Liens légaux */}
       <div style={{ marginTop: 24, paddingTop: 16, borderTop: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", textAlign: "center" }}>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
@@ -3491,6 +3539,58 @@ function ProfilePage({ user, setPage, setModal, logout, darkMode, toggleDarkMode
         </div>
         <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 10 }}>© 2026 Locatzy · Tous droits réservés</p>
       </div>
+    </div>
+  );
+}
+
+// ─── PAGE "COMMENT ÇA MARCHE" ─────────────────────────────────────────
+function HowItWorksPage({ goBack, darkMode, lang, t }) {
+  const content = FAQ_CONTENT[lang] || FAQ_CONTENT.fr;
+  const textColor = darkMode ? "#e5e7eb" : "#1a1a1a";
+  const mutedColor = darkMode ? "#9ca3af" : "#6b7280";
+  const bgCard = darkMode ? "#1a1a1a" : "white";
+
+  return (
+    <div style={{ padding: "16px", maxWidth: 760, margin: "0 auto" }}>
+      <button onClick={goBack} style={{ background: "none", border: "none", color: "#14b8a6", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 16 }}>← Retour</button>
+
+      <h1 className="display" style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, color: textColor }}>❓ Comment ça marche ?</h1>
+      <p style={{ fontSize: 14, color: mutedColor, marginBottom: 28 }}>Locatzy en 3 étapes simples</p>
+
+      {/* Les 3 étapes */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 36 }}>
+        {content.steps.map((s, i) => (
+          <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", background: darkMode ? "#0f2a26" : "#f0fdfa", borderRadius: 16, padding: 18 }}>
+            <span style={{ fontSize: 36, flexShrink: 0 }}>{s.icon}</span>
+            <div>
+              <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, color: textColor }}>{s.title}</h3>
+              <p style={{ fontSize: 14, color: mutedColor, lineHeight: 1.5 }}>{s.text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* FAQ */}
+      <h2 className="display" style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: textColor }}>💡 Questions fréquentes</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {content.questions.map((item, i) => (
+          <details key={i} style={{ background: bgCard, border: darkMode ? "1px solid #2a2a2a" : "1px solid #e5e7eb", borderRadius: 12, padding: 14, cursor: "pointer" }}>
+            <summary style={{ fontWeight: 700, fontSize: 14, color: textColor, listStyle: "none" }}>
+              <span style={{ color: "#14b8a6", marginRight: 6 }}>+</span> {item.q}
+            </summary>
+            <p style={{ fontSize: 13, color: mutedColor, marginTop: 10, lineHeight: 1.6 }}>{item.a}</p>
+          </details>
+        ))}
+      </div>
+
+      {/* Contact */}
+      <div style={{ marginTop: 36, padding: 20, background: darkMode ? "#1a1a1a" : "#f9fafb", borderRadius: 16, textAlign: "center" }}>
+        <p style={{ fontSize: 14, color: textColor, fontWeight: 700, marginBottom: 6 }}>📩 Une autre question ?</p>
+        <p style={{ fontSize: 13, color: mutedColor, marginBottom: 12 }}>Contactez notre équipe à :</p>
+        <a href="mailto:blackberrywalid72@gmail.com" style={{ color: "#14b8a6", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>blackberrywalid72@gmail.com</a>
+      </div>
+
+      <p style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", marginTop: 24 }}>© 2026 Locatzy · Tous droits réservés</p>
     </div>
   );
 }
@@ -5260,7 +5360,7 @@ function SearchableSelect({ options, value, onChange, placeholder = "— Choisir
 // ─── MODAL ───────────────────────────────────────────────────────────
 
 
-function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry, t, lang, submitIdentity }) {
+function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerifyCode, sendResetCode, resetPassword, addListing, updateListing, updateBlockedDates, book, payerAvecStripe, user, setPage, setCountry, setSearch, setFilter, listings, reviews, messages, sendMessage, addReview, updateReview, markMessagesRead, bookings, flash, customLodgingTypes, addLodgingType, payouts, requestWithdrawal, debtPayments, payerDetteAvecStripe, declareDebtPayment, customAirports, addCustomAirport, getAirportsForCountry, t, lang, submitIdentity, deleteAccount }) {
   const [form, setForm] = useState({});
   const tr = t || ((k) => k);
   const [photos, setPhotos] = useState([]);
@@ -5404,6 +5504,81 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   setModal(null);
                 }}>🚩 {tr("report")}</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {modal.type === "deleteAccount" && (
+          <div>
+            <h2 className="display" style={{ fontWeight: 800, fontSize: 22, marginBottom: 6, color: "#dc2626" }}>🗑️ Supprimer mon compte</h2>
+            <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 18 }}>
+              Cette action est <strong>définitive et irréversible</strong>. Pour confirmer, entrez votre email et votre mot de passe.
+            </p>
+
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: 12, marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: "#7f1d1d", lineHeight: 1.5, margin: 0 }}>
+                ⚠️ Toutes vos données seront supprimées : profil, photos, annonces, messages, réservations, avis, infos de paiement. Cette suppression ne peut pas être annulée.
+              </p>
+            </div>
+
+            <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 }}>Votre email</label>
+            <input
+              className="input"
+              type="email"
+              placeholder="exemple@email.com"
+              value={form.deleteEmail || ""}
+              onChange={e => set("deleteEmail", e.target.value)}
+              style={{ width: "100%", marginBottom: 14, boxSizing: "border-box" }}
+            />
+
+            <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 }}>Votre mot de passe</label>
+            <input
+              className="input"
+              type="password"
+              placeholder="••••••••"
+              value={form.deletePassword || ""}
+              onChange={e => set("deletePassword", e.target.value)}
+              style={{ width: "100%", marginBottom: 14, boxSizing: "border-box" }}
+            />
+
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 14, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={!!form.deleteConfirm}
+                onChange={e => set("deleteConfirm", e.target.checked)}
+                style={{ marginTop: 3 }}
+              />
+              <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.4 }}>
+                Je comprends que cette action est <strong>définitive</strong> et que mes données ne pourront pas être récupérées.
+              </span>
+            </label>
+
+            {formError && <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 600, marginBottom: 12 }}>⚠️ {formError}</div>}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModal(null)}>Annuler</button>
+              <button
+                className="btn"
+                style={{ flex: 2, background: "#dc2626", color: "white" }}
+                onClick={async () => {
+                  if (!form.deleteEmail || !form.deletePassword) {
+                    setFormError("Remplissez tous les champs");
+                    return;
+                  }
+                  if (!form.deleteConfirm) {
+                    setFormError("Cochez la case de confirmation");
+                    return;
+                  }
+                  const result = await deleteAccount(form.deleteEmail, form.deletePassword);
+                  if (!result.ok) {
+                    setFormError(result.error || "Erreur");
+                    return;
+                  }
+                  setModal(null);
+                }}
+              >
+                🗑️ Supprimer définitivement
+              </button>
             </div>
           </div>
         )}
