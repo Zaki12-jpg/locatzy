@@ -1943,6 +1943,68 @@ export default function App() {
     return () => { unsub(); unsubLodgingTypes(); unsubAirports(); unsubUsers(); unsubBookings(); unsubReviews(); unsubMessages(); unsubFavorites(); unsubNotifications(); unsubPayouts(); unsubDebtPayments(); };
   }, []);
 
+  // 📱 PUSH NOTIFICATIONS — initialise les notifications push système (Android natif uniquement)
+  useEffect(() => {
+    if (!user) return;
+    // Vérifier qu'on est sur une plateforme native (Android), pas sur le web
+    if (typeof window === "undefined" || !window.Capacitor || !window.Capacitor.isNativePlatform || !window.Capacitor.isNativePlatform()) return;
+
+    let regListener, recvListener, actionListener;
+
+    const setupPush = async () => {
+      try {
+        const { PushNotifications } = await import("@capacitor/push-notifications");
+
+        // 1) Demander la permission si nécessaire
+        let permStatus = await PushNotifications.checkPermissions();
+        if (permStatus.receive === "prompt") {
+          permStatus = await PushNotifications.requestPermissions();
+        }
+        if (permStatus.receive !== "granted") {
+          console.log("Push notifications: permission refusée");
+          return;
+        }
+
+        // 2) S'enregistrer auprès de FCM pour récupérer le token de l'appareil
+        await PushNotifications.register();
+
+        // 3) Quand le token est prêt, l'enregistrer dans le compte Firebase de l'utilisateur
+        regListener = await PushNotifications.addListener("registration", async (token) => {
+          console.log("FCM Token reçu:", token.value);
+          try {
+            if (user.fbId) {
+              await updateDoc(doc(db, "users", user.fbId), { fcmToken: token.value });
+            }
+          } catch (e) {
+            console.log("Erreur sauvegarde token FCM:", e);
+          }
+        });
+
+        // 4) Notification reçue pendant que l'app est ouverte (foreground)
+        recvListener = await PushNotifications.addListener("pushNotificationReceived", (notification) => {
+          console.log("Push reçue:", notification);
+          if (notification && notification.title) {
+            try { flash(`🔔 ${notification.title}`); } catch(e){}
+          }
+        });
+
+        // 5) L'utilisateur a tapé sur la notification
+        actionListener = await PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+          console.log("Push action:", action);
+        });
+      } catch (err) {
+        console.log("Erreur init push notifications:", err);
+      }
+    };
+    setupPush();
+
+    return () => {
+      try { if (regListener) regListener.remove(); } catch(e){}
+      try { if (recvListener) recvListener.remove(); } catch(e){}
+      try { if (actionListener) actionListener.remove(); } catch(e){}
+    };
+  }, [user]);
+
   // 🏷️ Remplir le cache global des types de logement custom (pour isLodging, icônes, labels)
   useEffect(() => {
     // On vide puis remplit le cache à chaque mise à jour Firebase

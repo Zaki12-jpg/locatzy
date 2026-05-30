@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "496184657296",
+    "project_id": "locatzy-ab8fd",
+    "storage_bucket": "locatzy-ab8fd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:496184657296:android:490329f242852c0917df15",
+        "android_client_info": {
+          "package_name": "com.locatzy.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqfrjetY1Nzz6IEoJ508fDwrCgKRQ2HH0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
