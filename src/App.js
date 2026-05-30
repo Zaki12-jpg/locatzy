@@ -8,6 +8,22 @@ import { db, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, 
 
 const COMMISSION_RATE = 0.15;
 
+// 🔧 FIX FUSEAU HORAIRE : formater une Date en "YYYY-MM-DD" en heure LOCALE
+// (évite le décalage d'un jour avec toISOString() qui convertit en UTC)
+const fmtLocalDate = (d) => {
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+// Parser une string "YYYY-MM-DD" en Date à minuit LOCAL (pas UTC)
+const parseLocalDate = (s) => {
+  if (!s) return new Date(NaN);
+  const parts = String(s).split('-').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+};
+
 // 📧 CONFIGURATION EMAILJS - Remplacez par vos vraies clés
 const EMAILJS_CONFIG = {
   serviceId: "service_41scm6k",
@@ -2235,7 +2251,7 @@ export default function App() {
     if (Date.now() > pending.expires) { return { ok: false, error: "Code expiré. Demandez un nouveau code." }; }
     if (codeEntered.trim() !== pending.code) { return { ok: false, error: "Code incorrect. Réessayez." }; }
     // Code correct → créer le compte dans Firebase (partagé entre appareils)
-    const newU = { ...pending.data, role: "user", verified: true, joined: new Date().toISOString().split("T")[0] };
+    const newU = { ...pending.data, role: "user", verified: true, joined: fmtLocalDate(new Date()) };
     try {
       const ref = await addDoc(collection(db, "users"), newU);
       const userWithId = { ...newU, fbId: ref.id, id: ref.id };
@@ -2302,7 +2318,7 @@ export default function App() {
   };
 
   const addListing = async (data) => {
-    const newL = { ...data, id: Date.now(), ownerId: user.id, ownerName: user.name, ownerEmail: user.email, status: "pending", createdAt: new Date().toISOString().split("T")[0] };
+    const newL = { ...data, id: Date.now(), ownerId: user.id, ownerName: user.name, ownerEmail: user.email, status: "pending", createdAt: fmtLocalDate(new Date()) };
     try {
       // 🔥 Enregistrer l'annonce dans Firebase (partagée par tous)
       await addDoc(collection(db, "listings"), newL);
@@ -3634,11 +3650,11 @@ function Home({ listings, filter, setFilter, country, setCountry, countries, sea
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div style={{ minWidth: 0 }}>
                 <label style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600, display: "block", marginBottom: 4, textAlign: "left" }}>{tr("start_date")}</label>
-                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} min={new Date().toISOString().split("T")[0]} style={{ width: "100%", border: "none", outline: "none", padding: "8px 6px", fontSize: 12, background: "#f9fafb", borderRadius: 10, fontFamily: "inherit", boxSizing: "border-box", minWidth: 0 }} />
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} min={fmtLocalDate(new Date())} style={{ width: "100%", border: "none", outline: "none", padding: "8px 6px", fontSize: 12, background: "#f9fafb", borderRadius: 10, fontFamily: "inherit", boxSizing: "border-box", minWidth: 0 }} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <label style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600, display: "block", marginBottom: 4, textAlign: "left" }}>{tr("end_date")}</label>
-                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || new Date().toISOString().split("T")[0]} style={{ width: "100%", border: "none", outline: "none", padding: "8px 6px", fontSize: 12, background: "#f9fafb", borderRadius: 10, fontFamily: "inherit", boxSizing: "border-box", minWidth: 0 }} />
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || fmtLocalDate(new Date())} style={{ width: "100%", border: "none", outline: "none", padding: "8px 6px", fontSize: 12, background: "#f9fafb", borderRadius: 10, fontFamily: "inherit", boxSizing: "border-box", minWidth: 0 }} />
               </div>
             </div>
             {(dateFrom || dateTo) && (
@@ -4154,8 +4170,8 @@ function PublicAvailabilityCalendar({ listing, bookings, t }) {
   const unavailable = new Set();
   // Réservations de cette annonce
   (bookings || []).filter(b => b.listingId === listing.id && b.status !== "cancelled" && b.status !== "rejected").forEach(b => {
-    let d = new Date(b.from); const end = new Date(b.to);
-    while (d <= end) { unavailable.add(d.toISOString().split("T")[0]); d.setDate(d.getDate() + 1); }
+    let d = parseLocalDate(b.from); const end = parseLocalDate(b.to);
+    while (d <= end) { unavailable.add(fmtLocalDate(d)); d.setDate(d.getDate() + 1); }
   });
   // Dates bloquées manuellement par le proprio
   (listing.blockedDates || []).forEach(d => unavailable.add(d));
@@ -4190,7 +4206,7 @@ function PublicAvailabilityCalendar({ listing, bookings, t }) {
         {cells.map((d, i) => {
           if (d === null) return <div key={i} />;
           const dateObj = new Date(year, month, d);
-          const dateStr = dateObj.toISOString().split("T")[0];
+          const dateStr = fmtLocalDate(dateObj);
           const isPast = dateObj < today;
           const isUnavailable = unavailable.has(dateStr);
           let bg = "#f0fdf4", color = "#16a34a"; // dispo (vert clair)
@@ -5899,11 +5915,11 @@ function Modal({ modal, setModal, login, register, verifyEmailCode, resendVerify
                   <div></div>
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d" }}>📅 Début</label>
-                    <input className="input" type="date" min={new Date().toISOString().split("T")[0]} value={form.promoFrom || ""} onChange={e => set("promoFrom", e.target.value)} style={{ background: "white", marginTop: 4 }} />
+                    <input className="input" type="date" min={fmtLocalDate(new Date())} value={form.promoFrom || ""} onChange={e => set("promoFrom", e.target.value)} style={{ background: "white", marginTop: 4 }} />
                   </div>
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d" }}>📅 Fin</label>
-                    <input className="input" type="date" min={form.promoFrom || new Date().toISOString().split("T")[0]} value={form.promoUntil || ""} onChange={e => set("promoUntil", e.target.value)} style={{ background: "white", marginTop: 4 }} />
+                    <input className="input" type="date" min={form.promoFrom || fmtLocalDate(new Date())} value={form.promoUntil || ""} onChange={e => set("promoUntil", e.target.value)} style={{ background: "white", marginTop: 4 }} />
                   </div>
                 </div>
                 {form.promoPrice > 0 && form.promoUntil && form.price > 0 && form.promoPrice < form.price && (
@@ -6920,12 +6936,12 @@ function AvailabilityCalendar({ listing, updateBlockedDates, setModal, bookings 
   // Jours où le retour (fin de location) est interdit
   const [noReturn, setNoReturn] = useState(Array.isArray(listing.noReturnDates) ? [...listing.noReturnDates] : []);
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const fmt = (d) => d.toISOString().split("T")[0];
+  const fmt = (d) => fmtLocalDate(d);
 
   // Dates déjà réservées (non modifiables par le propriétaire)
   const bookedSet = new Set();
   bookings.filter(b => b.listingId === listing.id && b.status === "confirmed").forEach(b => {
-    for (let d = new Date(b.from); d <= new Date(b.to); d.setDate(d.getDate() + 1)) bookedSet.add(fmt(d));
+    for (let d = parseLocalDate(b.from); d <= parseLocalDate(b.to); d.setDate(d.getDate() + 1)) bookedSet.add(fmt(d));
   });
 
   const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
@@ -7054,15 +7070,15 @@ function BookingCalendar({ listing, user, book, setModal }) {
   const maxDate = new Date(today); maxDate.setFullYear(maxDate.getFullYear() + 1);
   const bookedSet = new Set();
   bookedDates.forEach(b => {
-    for (let d = new Date(b.from); d <= new Date(b.to); d.setDate(d.getDate() + 1)) {
-      bookedSet.add(d.toISOString().split("T")[0]);
+    for (let d = parseLocalDate(b.from); d <= parseLocalDate(b.to); d.setDate(d.getDate() + 1)) {
+      bookedSet.add(fmtLocalDate(d));
     }
   });
   // Ajouter les dates bloquées manuellement par le propriétaire
   if (Array.isArray(listing.blockedDates)) {
     listing.blockedDates.forEach(ds => bookedSet.add(ds));
   }
-  const fmt = (d) => d.toISOString().split("T")[0];
+  const fmt = (d) => fmtLocalDate(d);
   const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
   const firstDay = new Date(year, month, 1);
   const startWeekday = (firstDay.getDay() + 6) % 7;
